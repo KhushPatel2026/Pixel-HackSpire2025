@@ -10,7 +10,7 @@ const Profile = () => {
   const [passwordData, setPasswordData] = useState({
     currentPassword: '',
     newPassword: '',
-    confirmPassword: ''
+    confirmPassword: '',
   });
   const [errors, setErrors] = useState({});
   const navigate = useNavigate();
@@ -27,7 +27,7 @@ const Profile = () => {
     }
   }, [location, navigate]);
 
-  // Verify token and fetch profile
+  // Fetch profile
   useEffect(() => {
     const token = localStorage.getItem('token');
     if (!token) {
@@ -36,48 +36,35 @@ const Profile = () => {
       return;
     }
 
-    const verifyToken = async (retryCount = 0) => {
+    const fetchProfile = async (retryCount = 0) => {
       try {
-        const response = await fetch('http://localhost:3000/api/auth/verify-token', {
+        const response = await fetch('http://localhost:3000/api/profile', {
           headers: { 'x-access-token': token },
         });
 
-        if (!response.ok) throw new Error('Token verification failed');
+        if (!response.ok) {
+          throw new Error('Failed to fetch profile');
+        }
 
         const data = await response.json();
-        if (data.status !== 'ok') {
-          if (retryCount < 3) {
-            setTimeout(() => verifyToken(retryCount + 1), 5000);
-            return;
-          }
-          throw new Error(data.error || 'Invalid token');
-        }
-
-        const profileResponse = await fetch('http://localhost:3000/api/profile', {
-          headers: { 'x-access-token': token },
-        });
-
-        if (!profileResponse.ok) throw new Error('Failed to fetch profile');
-
-        const profileData = await profileResponse.json();
-        if (profileData.status === 'ok') {
-          setProfile(profileData.profile);
+        if (data.status === 'ok') {
+          setProfile(data.profile);
+          setLoading(false);
         } else {
-          throw new Error(profileData.error || 'Profile fetch failed');
+          throw new Error(data.error || 'Profile fetch failed');
         }
-        setLoading(false);
       } catch (error) {
         if (retryCount < 3) {
-          setTimeout(() => verifyToken(retryCount + 1), 5000);
+          setTimeout(() => fetchProfile(retryCount + 1), 5000);
         } else {
-          toast.error(error.message);
+          toast.error(error.message || 'Failed to load profile');
           localStorage.removeItem('token');
           navigate('/login');
         }
       }
     };
 
-    verifyToken();
+    fetchProfile();
   }, [navigate]);
 
   // Edit profile handler
@@ -86,25 +73,49 @@ const Profile = () => {
     const token = localStorage.getItem('token');
     const form = e.target;
 
+    const name = form.name.value.trim();
+    const email = form.email.value.trim();
+    const preferredDifficulty = form.preferredDifficulty.value;
+    const preferredLearningStyle = form.preferredLearningStyle.value;
+    const dailyStudyTime = form.dailyStudyTime.value.trim();
+
+    // Validate inputs
+    const newErrors = {};
+    if (!name) newErrors.name = 'Name is required';
+    if (!email) newErrors.email = 'Email is required';
+    if (dailyStudyTime && (isNaN(dailyStudyTime) || dailyStudyTime <= 0)) {
+      newErrors.dailyStudyTime = 'Study time must be a positive number';
+    }
+    setErrors(newErrors);
+    if (Object.keys(newErrors).length > 0) {
+      return;
+    }
+
     try {
-      const response = await fetch('http://localhost:3000/api/profile/edit', {
+      const response = await fetch('http://localhost:3000/api/profile/profile/edit', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'x-access-token': token,
         },
         body: JSON.stringify({
-          name: form.name.value.trim(),
-          email: form.email.value.trim(),
+          name,
+          email,
+          preferredDifficulty: preferredDifficulty || undefined,
+          preferredLearningStyle: preferredLearningStyle || undefined,
+          dailyStudyTime: dailyStudyTime ? parseInt(dailyStudyTime) : undefined,
         }),
       });
 
-      if (!response.ok) throw new Error('Failed to update profile');
+      if (!response.ok) {
+        throw new Error('Failed to update profile');
+      }
 
       const data = await response.json();
       if (data.status === 'ok') {
         toast.success('Profile updated successfully');
         setProfile(data.profile);
+        setErrors({});
       } else {
         throw new Error(data.error || 'Profile update failed');
       }
@@ -144,7 +155,7 @@ const Profile = () => {
     }
 
     try {
-      const response = await fetch('http://localhost:3000/api/profile/change-password', {
+      const response = await fetch('http://localhost:3000/api/profile/profile/change-password', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -156,7 +167,9 @@ const Profile = () => {
         }),
       });
 
-      if (!response.ok) throw new Error('Failed to change password');
+      if (!response.ok) {
+        throw new Error('Failed to change password');
+      }
 
       const data = await response.json();
       if (data.status === 'ok') {
@@ -192,28 +205,78 @@ const Profile = () => {
           <div className="space-y-4 text-gray-300 mb-6">
             <p><span className="font-semibold text-white">Name:</span> {profile.name}</p>
             <p><span className="font-semibold text-white">Email:</span> {profile.email}</p>
+            <p><span className="font-semibold text-white">Difficulty Level:</span> {profile.learningPreferences?.preferredDifficulty || 'Not set'}</p>
+            <p><span className="font-semibold text-white">Learning Style:</span> {profile.learningPreferences?.preferredLearningStyle || 'Not set'}</p>
+            <p><span className="font-semibold text-white">Daily Study Time:</span> {profile.learningPreferences?.dailyStudyTime ? `${profile.learningPreferences.dailyStudyTime} mins` : 'Not set'}</p>
           </div>
         )}
 
         <form onSubmit={handleEditProfile} className="space-y-6">
-          <input
-            type="text"
-            name="name"
-            placeholder="Name"
-            defaultValue={profile?.name}
-            required
-            className="w-full px-4 py-3 bg-gray-800/50 border border-gray-700 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:border-transparent transition-all duration-300"
-          />
-          <input
-            type="email"
-            name="email"
-            placeholder="Email"
-            defaultValue={profile?.email}
-            required
-            className="w-full px-4 py-3 bg-gray-800/50 border border-gray-700 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:border-transparent transition-all duration-300"
-          />
+          <div>
+            <input
+              type="text"
+              name="name"
+              placeholder="Name"
+              defaultValue={profile?.name}
+              required
+              aria-label="Name"
+              className="w-full px-4 py-3 bg-gray-800/50 border border-gray-700 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:border-transparent transition-all duration-300"
+            />
+            {errors.name && <p className="text-red-400 text-sm mt-1">{errors.name}</p>}
+          </div>
+          <div>
+            <input
+              type="email"
+              name="email"
+              placeholder="Email"
+              defaultValue={profile?.email}
+              required
+              aria-label="Email"
+              className="w-full px-4 py-3 bg-gray-800/50 border border-gray-700 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:border-transparent transition-all duration-300"
+            />
+            {errors.email && <p className="text-red-400 text-sm mt-1">{errors.email}</p>}
+          </div>
+          <div>
+            <select
+              name="preferredDifficulty"
+              defaultValue={profile?.learningPreferences?.preferredDifficulty || ''}
+              aria-label="Preferred Difficulty"
+              className="w-full px-4 py-3 bg-gray-800/50 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-gray-500 focus:border-transparent transition-all duration-300"
+            >
+              <option value="">Select Difficulty</option>
+              <option value="Easy">Easy</option>
+              <option value="Medium">Medium</option>
+              <option value="Hard">Hard</option>
+            </select>
+          </div>
+          <div>
+            <select
+              name="preferredLearningStyle"
+              defaultValue={profile?.learningPreferences?.preferredLearningStyle || ''}
+              aria-label="Preferred Learning Style"
+              className="w-full px-4 py-3 bg-gray-800/50 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-gray-500 focus:border-transparent transition-all duration-300"
+            >
+              <option value="">Select Learning Style</option>
+              <option value="Visual">Visual</option>
+              <option value="Auditory">Auditory</option>
+              <option value="Reading/Writing">Reading/Writing</option>
+              <option value="Kinesthetic">Kinesthetic</option>
+            </select>
+          </div>
+          <div>
+            <input
+              type="number"
+              name="dailyStudyTime"
+              placeholder="Daily Study Time (minutes)"
+              defaultValue={profile?.learningPreferences?.dailyStudyTime || ''}
+              aria-label="Daily Study Time"
+              className="w-full px-4 py-3 bg-gray-800/50 border border-gray-700 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:border-transparent transition-all duration-300"
+            />
+            {errors.dailyStudyTime && <p className="text-red-400 text-sm mt-1">{errors.dailyStudyTime}</p>}
+          </div>
           <button
             type="submit"
+            aria-label="Save Profile Changes"
             className="w-full py-3 bg-gradient-to-r from-gray-700 to-gray-900 text-white rounded-lg font-semibold hover:from-gray-600 hover:to-gray-800 transition-all duration-300 transform hover:-translate-y-1 hover:shadow-lg"
           >
             Save Changes
@@ -222,6 +285,7 @@ const Profile = () => {
 
         <button
           onClick={() => setIsPasswordModalOpen(true)}
+          aria-label="Change Password"
           className="w-full mt-4 py-3 bg-white/5 border border-white/20 text-white rounded-lg font-semibold hover:bg-white/10 transition-all duration-300"
         >
           Change Password
@@ -237,9 +301,10 @@ const Profile = () => {
                 <input
                   type="password"
                   value={passwordData.currentPassword}
-                  onChange={(e) => setPasswordData({...passwordData, currentPassword: e.target.value})}
+                  onChange={(e) => setPasswordData({ ...passwordData, currentPassword: e.target.value })}
                   placeholder="Current Password"
                   required
+                  aria-label="Current Password"
                   className="w-full px-4 py-3 bg-gray-800/50 border border-gray-700 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:border-transparent transition-all duration-300"
                 />
                 {errors.currentPassword && <p className="text-red-400 text-sm mt-1">{errors.currentPassword}</p>}
@@ -248,9 +313,10 @@ const Profile = () => {
                 <input
                   type="password"
                   value={passwordData.newPassword}
-                  onChange={(e) => setPasswordData({...passwordData, newPassword: e.target.value})}
+                  onChange={(e) => setPasswordData({ ...passwordData, newPassword: e.target.value })}
                   placeholder="New Password"
                   required
+                  aria-label="New Password"
                   className="w-full px-4 py-3 bg-gray-800/50 border border-gray-700 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:border-transparent transition-all duration-300"
                 />
                 {errors.newPassword && <p className="text-red-400 text-sm mt-1">{errors.newPassword}</p>}
@@ -259,9 +325,10 @@ const Profile = () => {
                 <input
                   type="password"
                   value={passwordData.confirmPassword}
-                  onChange={(e) => setPasswordData({...passwordData, confirmPassword: e.target.value})}
+                  onChange={(e) => setPasswordData({ ...passwordData, confirmPassword: e.target.value })}
                   placeholder="Confirm New Password"
                   required
+                  aria-label="Confirm New Password"
                   className="w-full px-4 py-3 bg-gray-800/50 border border-gray-700 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:border-transparent transition-all duration-300"
                 />
                 {errors.confirmPassword && <p className="text-red-400 text-sm mt-1">{errors.confirmPassword}</p>}
@@ -269,6 +336,7 @@ const Profile = () => {
               <div className="flex gap-4">
                 <button
                   type="submit"
+                  aria-label="Update Password"
                   className="flex-1 py-3 bg-gradient-to-r from-gray-700 to-gray-900 text-white rounded-lg font-semibold hover:from-gray-600 hover:to-gray-800 transition-all duration-300"
                 >
                   Update Password
@@ -280,6 +348,7 @@ const Profile = () => {
                     setErrors({});
                     setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' });
                   }}
+                  aria-label="Cancel"
                   className="flex-1 py-3 bg-white/5 border border-white/20 text-white rounded-lg font-semibold hover:bg-white/10 transition-all duration-300"
                 >
                   Cancel

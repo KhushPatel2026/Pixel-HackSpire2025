@@ -231,67 +231,7 @@ export default function DocumentChat() {
             </div>
           </div>
         )}
-      </main>
-
-      <footer className="relative py-12 border-t border-green-900/30">
-        <div className="container mx-auto px-4">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
-            <div className="md:col-span-1">
-              <div className="flex items-center space-x-2 mb-4">
-                <BookOpen className="h-6 w-6 text-green-500" />
-                <span className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-green-500 to-emerald-500">
-                  LearnFlow
-                </span>
-              </div>
-              <p className="text-gray-400 text-sm">
-                AI-powered learning assistant that adapts to your style and pace.
-              </p>
-            </div>
-            <div>
-              <h3 className="font-bold text-white mb-4">Product</h3>
-              <ul className="space-y-2">
-                <li><a href="#features" className="text-gray-400 hover:text-green-400 transition-colors">Features</a></li>
-                <li><a href="#pricing" className="text-gray-400 hover:text-green-400 transition-colors">Pricing</a></li>
-                <li><a href="#testimonials" className="text-gray-400 hover:text-green-400 transition-colors">Testimonials</a></li>
-                <li><a href="#faq" className="text-gray-400 hover:text-green-400 transition-colors">FAQ</a></li>
-              </ul>
-            </div>
-            <div>
-              <h3 className="font-bold text-white mb-4">Company</h3>
-              <ul className="space-y-2">
-                <li><a href="#about" className="text-gray-400 hover:text-green-400 transition-colors">About Us</a></li>
-                <li><a href="#careers" className="text-gray-400 hover:text-green-400 transition-colors">Careers</a></li>
-                <li><a href="#contact" className="text-gray-400 hover:text-green-400 transition-colors">Contact</a></li>
-                <li><a href="#blog" className="text-gray-400 hover:text-green-400 transition-colors">Blog</a></li>
-              </ul>
-            </div>
-            <div>
-              <h3 className="font-bold text-white mb-4">Legal</h3>
-              <ul className="space-y-2">
-                <li><a href="#terms" className="text-gray-400 hover:text-green-400 transition-colors">Terms of Service</a></li>
-                <li><a href="#privacy" className="text-gray-400 hover:text-green-400 transition-colors">Privacy Policy</a></li>
-                <li><a href="#cookies" className="text-gray-400 hover:text-green-400 transition-colors">Cookie Policy</a></li>
-              </ul>
-            </div>
-          </div>
-          <div className="mt-12 pt-8 border-t border-green-900/30 flex flex-col md:flex-row justify-between items-center">
-            <p className="text-gray-400 text-sm mb-4 md:mb-0">
-              © {new Date().getFullYear()} LearnFlow. All rights reserved.
-            </p>
-            <div className="flex space-x-6">
-              <a href="#" className="text-gray-400 hover:text-green-400 transition-colors">
-                <span className="sr-only">Twitter</span>
-              </a>
-              <a href="#" className="text-gray-400 hover:text-green-400 transition-colors">
-                <span className="sr-only">LinkedIn</span>
-              </a>
-              <a href="#" className="text-gray-400 hover:text-green-400 transition-colors">
-                <span className="sr-only">GitHub</span>
-              </a>
-            </div>
-          </div>
-        </div>
-      </footer>
+          </main>
     </div>
   );
 }

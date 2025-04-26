@@ -8,7 +8,7 @@ const learningPathSchema = new mongoose.Schema({
         topicDescription: { type: String, required: true },
         topicResourceLink: [{ type: String }],
         completionStatus: { type: Boolean, default: false },
-        timeSpent: { type: Number, default: 0 }, // Changed to Number for easier calculations
+        timeSpent: { type: Number, default: 0 },
         completionDate: { type: Date },
         aiGeneratedSummary: { type: String }
     }],
@@ -19,9 +19,9 @@ const learningPathSchema = new mongoose.Schema({
     courseWeakness: { type: String },
     courseScore: { type: Number, default: 0 },
     courseResult: { type: String, default: 'In Progress' },
-    courseDuration: { type: Number }, // Changed to Number (in hours)
+    courseDuration: { type: Number },
     quizzes: [{
-        quizId: { type: mongoose.Schema.Types.ObjectId, ref: 'Quiz' },
+        quizId: { type: mongoose.Schema.Types.ObjectId, required: true, ref: 'LearningPathQuiz' },
         completed: { type: Boolean, default: false }
     }],
     difficultyLevel: { type: String, required: true, enum: ['Easy', 'Medium', 'Hard'] },
