@@ -57,7 +57,11 @@ function AuthComponent() {
                 localStorage.setItem('token', data.user);
                 toast.success(`${isLogin ? 'Login' : 'Registration'} successful!`);
                 setTimeout(() => {
+                    if(isLogin==='Login') {
                     window.location.href = '/profile';
+                    } else {
+                    window.location.href = '/onboarding';
+                    }
                 }, 1500);
             } else {
                 toast.error('Please check your credentials');

@@ -66,10 +66,7 @@ const OnboardingProcess = ({ onComplete }) => {
 
       const response = await fetch('http://localhost:3000/api/profile/user/preferences', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-access-token': token,
-        },
+        headers: { 'x-access-token': token },
         body: JSON.stringify({
           difficultyLevel,
           learningStyle,
