@@ -137,20 +137,29 @@ Ask questions about the uploaded document.
 ## Current Progress
 
 ✅ Implemented:
-- Basic project structure and setup
 - PDF upload and processing
 - Document text extraction and chunking
 - Integration with Gemini AI for text generation
 - Integration with Pinecone for vector storage
-- Basic chat functionality
-- Modern UI with Tailwind CSS
+- Adaptive quiz recommendations with interactive buttons
+- Gamification hub for streaks and badges
+- Quick access toolbar for navigation
+- Smooth animations using Framer Motion
+- Token-based authentication and navigation
+- Chatbot interface for answering questions
+- Step-by-step concept explanations
+- Text-based interaction support
+- Voice-based interaction with silence detection
+- Audio response playback for answers
 
 🚧 In Progress/TODO:
 - Multiple document support
 - Chat history persistence
 - Advanced error handling
-- User authentication
 - Document management features
+- Personalized progress tracker with visual dashboards
+- study groups basically a community forum
+- 
 - Enhanced UI/UX features
 
 ## Contributing
