@@ -569,135 +569,7 @@ export default function Landing() {
       </section>
 
       {/* Testimonials Section */}
-      <section id="testimonials" className="relative py-20 md:py-32">
-        <div className="container mx-auto px-4 z-10 relative">
-          <div className="text-center mb-16">
-            <motion.h2
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.6 }}
-              className="text-3xl md:text-5xl font-bold mb-6"
-            >
-              What Our{' '}
-              <span className="bg-clip-text text-transparent bg-gradient-to-r from-green-400 to-emerald-400">
-                Students
-              </span>{' '}
-              Say
-            </motion.h2>
-            <motion.p
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.6, delay: 0.2 }}
-              className="text-lg text-gray-300 max-w-2xl mx-auto"
-            >
-              Real success stories from students who transformed their learning experience
-            </motion.p>
-          </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {/* Testimonial 1 */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.6 }}
-              whileHover={{ y: -10, transition: { duration: 0.3 } }}
-              className="bg-gradient-to-tr from-[#0d1f0d] to-[#153515] p-1 rounded-2xl group"
-            >
-              <div className="bg-[#0a1a0a]/80 backdrop-blur-sm p-6 rounded-2xl h-full border border-green-500/20 relative overflow-hidden">
-                <div className="absolute inset-0 bg-gradient-to-tr from-green-600/10 to-emerald-600/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-                <div className="flex items-center mb-4 relative z-10">
-                  <div className="w-12 h-12 rounded-full bg-gradient-to-r from-green-500 to-emerald-500 flex items-center justify-center text-white font-bold text-lg">
-                    JD
-                  </div>
-                  <div className="ml-4">
-                    <h3 className="text-lg font-bold text-white">Jamie D.</h3>
-                    <p className="text-sm text-green-400">Computer Science Student</p>
-                  </div>
-                </div>
-                <p className="text-gray-300 mb-4 relative z-10 italic">
-                  "LearnFlow simplified complex algorithms for me. The personalized quizzes helped me identify weak spots I wouldn't have found otherwise."
-                </p>
-                <div className="flex text-yellow-400">
-                  <Star className="h-5 w-5 fill-current" />
-                  <Star className="h-5 w-5 fill-current" />
-                  <Star className="h-5 w-5 fill-current" />
-                  <Star className="h-5 w-5 fill-current" />
-                  <Star className="h-5 w-5 fill-current" />
-                </div>
-              </div>
-            </motion.div>
-
-            {/* Testimonial 2 */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.6, delay: 0.2 }}
-              whileHover={{ y: -10, transition: { duration: 0.3 } }}
-              className="bg-gradient-to-tr from-[#0d1f0d] to-[#153515] p-1 rounded-2xl group"
-            >
-              <div className="bg-[#0a1a0a]/80 backdrop-blur-sm p-6 rounded-2xl h-full border border-green-500/20 relative overflow-hidden">
-                <div className="absolute inset-0 bg-gradient-to-tr from-green-600/10 to-emerald-600/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-                <div className="flex items-center mb-4 relative z-10">
-                  <div className="w-12 h-12 rounded-full bg-gradient-to-r from-emerald-500 to-green-500 flex items-center justify-center text-white font-bold text-lg">
-                    SR
-                  </div>
-                  <div className="ml-4">
-                    <h3 className="text-lg font-bold text-white">Sarah R.</h3>
-                    <p className="text-sm text-green-400">Biology Major</p>
-                  </div>
-                </div>
-                <p className="text-gray-300 mb-4 relative z-10 italic">
-                  "The way LearnFlow breaks down complex biology concepts into simple explanations helped me ace my midterms. I love the visual learning aids!"
-                </p>
-                <div className="flex text-yellow-400">
-                  <Star className="h-5 w-5 fill-current" />
-                  <Star className="h-5 w-5 fill-current" />
-                  <Star className="h-5 w-5 fill-current" />
-                  <Star className="h-5 w-5 fill-current" />
-                  <Star className="h-5 w-5 fill-current" />
-                </div>
-              </div>
-            </motion.div>
-
-            {/* Testimonial 3 */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.6, delay: 0.4 }}
-              whileHover={{ y: -10, transition: { duration: 0.3 } }}
-              className="bg-gradient-to-tr from-[#0d1f0d] to-[#153515] p-1 rounded-2xl group"
-            >
-              <div className="bg-[#0a1a0a]/80 backdrop-blur-sm p-6 rounded-2xl h-full border border-green-500/20 relative overflow-hidden">
-                <div className="absolute inset-0 bg-gradient-to-tr from-green-600/10 to-emerald-600/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-                <div className="flex items-center mb-4 relative z-10">
-                  <div className="w-12 h-12 rounded-full bg-gradient-to-r from-green-500 to-emerald-500 flex items-center justify-center text-white font-bold text-lg">
-                    MT
-                  </div>
-                  <div className="ml-4">
-                    <h3 className="text-lg font-bold text-white">Michael T.</h3>
-                    <p className="text-sm text-green-400">Physics Student</p>
-                  </div>
-                </div>
-                <p className="text-gray-300 mb-4 relative z-10 italic">
-                  "The conversational study partner made quantum physics actually enjoyable! I went from barely passing to becoming the top student in my class."
-                </p>
-                <div className="flex text-yellow-400">
-                  <Star className="h-5 w-5 fill-current" />
-                  <Star className="h-5 w-5 fill-current" />
-                  <Star className="h-5 w-5 fill-current" />
-                  <Star className="h-5 w-5 fill-current" />
-                  <Star className="h-5 w-5 fill-current" />
-                </div>
-              </div>
-            </motion.div>
-          </div>
-        </div>
-      </section>
 
       {/* Call to Action Section */}
       <section className="relative py-20 md:py-32">
@@ -732,13 +604,13 @@ export default function Landing() {
                     className="px-8 py-4 rounded-full bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 text-white font-medium transition-all duration-300 hover:shadow-[0_0_20px_rgba(16,185,129,0.6)] transform group"
                   >
                     <span className="flex items-center justify-center text-lg">
-                      {token ? 'Go to Dashboard' : 'Start Free Trial'}
+                      {token ? 'Go to Dashboard' : 'Start learning now'}
                       <ChevronRight className="ml-2 h-5 w-5 transform group-hover:translate-x-1 transition-transform duration-300" />
                     </span>
                   </button>
                 </motion.div>
 
-                <p className="mt-6 text-gray-400 text-sm">No credit card required. 7-day free trial.</p>
+                <p className="mt-6 text-gray-400 text-sm">Who are you waiting for? Start learning in an exciting wayyy now!</p>
               </div>
             </div>
           </motion.div>
@@ -748,68 +620,13 @@ export default function Landing() {
       {/* Footer */}
       <footer className="relative py-12 border-t border-green-900/30">
         <div className="container mx-auto px-4">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
-            <div className="md:col-span-1">
-              <Link to="/" className="flex items-center space-x-2 mb-4">
-                <BookOpen className="h-6 w-6 text-green-500" />
-                <span className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-green-500 to-emerald-500">
-                  LearnFlow
-                </span>
-              </Link>
-              <p className="text-gray-400 text-sm">
-                AI-powered learning assistant that adapts to your style and pace.
-              </p>
-            </div>
+          
 
-            <div>
-              <h3 className="font-bold text-white mb-4">Product</h3>
-              <ul className="space-y-2">
-                <li><a href="#features" className="text-gray-400 hover:text-green-400 transition-colors">Features</a></li>
-                <li><a href="#pricing" className="text-gray-400 hover:text-green-400 transition-colors">Pricing</a></li>
-                <li><a href="#testimonials" className="text-gray-400 hover:text-green-400 transition-colors">Testimonials</a></li>
-                <li><a href="#faq" className="text-gray-400 hover:text-green-400 transition-colors">FAQ</a></li>
-              </ul>
-            </div>
-
-            <div>
-              <h3 className="font-bold text-white mb-4">Company</h3>
-              <ul className="space-y-2">
-                <li><a href="#about" className="text-gray-400 hover:text-green-400 transition-colors">About Us</a></li>
-                <li><a href="#careers" className="text-gray-400 hover:text-green-400 transition-colors">Careers</a></li>
-                <li><a href="#contact" className="text-gray-400 hover:text-green-400 transition-colors">Contact</a></li>
-                <li><a href="#blog" className="text-gray-400 hover:text-green-400 transition-colors">Blog</a></li>
-              </ul>
-            </div>
-
-            <div>
-              <h3 className="font-bold text-white mb-4">Legal</h3>
-              <ul className="space-y-2">
-                <li><a href="#terms" className="text-gray-400 hover:text-green-400 transition-colors">Terms of Service</a></li>
-                <li><a href="#privacy" className="text-gray-400 hover:text-green-400 transition-colors">Privacy Policy</a></li>
-                <li><a href="#cookies" className="text-gray-400 hover:text-green-400 transition-colors">Cookie Policy</a></li>
-              </ul>
-            </div>
-          </div>
-
-          <div className="mt-12 pt-8 border-t border-green-900/30 flex flex-col md:flex-row justify-between items-center">
-            <p className="text-gray-400 text-sm mb-4 md:mb-0">
-              © {new Date().getFullYear()} LearnFlow. All rights reserved.
+            <p className="text-gray-400 text-sm mb-4 md:mb-0 text-center">
+              © {new Date().getFullYear()} LearnFlow. Made with ❤️ by Pixel.
             </p>
-            <div className="flex space-x-6">
-              <a href="#" className="text-gray-400 hover:text-green-400 transition-colors">
-                <span className="sr-only">Twitter</span>
-                {/* Twitter/X icon would go here */}
-              </a>
-              <a href="#" className="text-gray-400 hover:text-green-400 transition-colors">
-                <span className="sr-only">LinkedIn</span>
-                {/* LinkedIn icon would go here */}
-              </a>
-              <a href="#" className="text-gray-400 hover:text-green-400 transition-colors">
-                <span className="sr-only">GitHub</span>
-                {/* GitHub icon would go here */}
-              </a>
-            </div>
-          </div>
+            
+          
         </div>
       </footer>
     </div>
