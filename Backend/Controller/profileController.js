@@ -176,45 +176,4 @@ const savePreferences = async (req, res) => {
   }
 };
 
-const handleComplete = async () => {
-  setIsLoading(true);
-  try {
-    const token = localStorage.getItem('token');
-    if (!token) {
-      throw new Error('No authentication token found');
-    }
-
-    const response = await fetch('http://localhost:3000/api/profile/user/preferences', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-access-token': token,
-      },
-      body: JSON.stringify({
-        difficultyLevel,
-        learningStyle,
-        studyTime,
-      }),
-    });
-
-    const data = await response.json();
-    if (!response.ok) {
-      throw new Error(data.error || 'Failed to save preferences');
-    }
-
-    toast.success('Your preferences have been saved!');
-    localStorage.removeItem('onboardingStep');
-    if (onComplete) {
-      setTimeout(() => {
-        onComplete();
-      }, 1500);
-    }
-  } catch (error) {
-    toast.error(error.message || 'Something went wrong. Please try again.');
-    console.error('Error in handleComplete:', error);
-  } finally {
-    setIsLoading(false);
-  }
-};
-
-module.exports = { getProfile, editProfile, changePassword, savePreferences, handleComplete };
+module.exports = { getProfile, editProfile, changePassword, savePreferences };

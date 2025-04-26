@@ -8,26 +8,65 @@ const { PassThrough } = require('stream');
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 const deepgram = createClient(process.env.DEEPGRAM_API_KEY);
 
+const cleanJsonResponse = (rawText) => {
+    return rawText
+        .replace(/```json\s*\n?/, '')
+        .replace(/```\s*$/, '')
+        .replace(/^\s+|\s+$/g, '')
+        .replace(/\n/g, '');
+};
+
+const parseJsonSafely = (text, fallback, errorMessage) => {
+    try {
+        return JSON.parse(text);
+    } catch (error) {
+        console.error(errorMessage, error);
+        return fallback;
+    }
+};
+
+const isValidUrl = (url) => {
+    try {
+        new URL(url);
+        return url.startsWith('http://') || url.startsWith('https://');
+    } catch {
+        return false;
+    }
+};
+
 const generateSimplifiedContent = async (content, contentType) => {
-    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
-    const prompt = `Simplify the following ${contentType} content for easier understanding:\n\n${content}\n\nProvide a simplified version and list key points.`;
-    const result = await model.generateContent(prompt);
-    const response = await result.response;
-    const text = response.text();
+    try {
+        const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+        const prompt = `Simplify the following ${contentType} content for a student in a student-friendly way. Return a JSON object with:
+- title: "Simplified Content"
+- content: Simplified explanation (string)
+- keyPoints: Array of key points (strings)
+Content: ${content}`;
+        const result = await model.generateContent(prompt);
+        const response = await result.response;
+        const rawText = response.text();
 
-    const simplifiedText = text.split('Key Points:')[0].trim();
-    const keyPoints = text
-        .split('Key Points:')[1]
-        ?.split('\n')
-        .filter(point => point.trim())
-        .map(point => point.replace(/^- /, '')) || [];
+        const cleanedText = cleanJsonResponse(rawText);
+        const fallback = { title: 'Simplified Content', content: 'Unable to simplify content.', keyPoints: [] };
+        const parsed = parseJsonSafely(cleanedText, fallback, 'Failed to parse simplified content JSON');
 
-    return { simplifiedText, keyPoints };
+        if (
+            typeof parsed.title !== 'string' ||
+            typeof parsed.content !== 'string' ||
+            !Array.isArray(parsed.keyPoints)
+        ) {
+            return fallback;
+        }
+        return parsed;
+    } catch (error) {
+        console.error('generateSimplifiedContent error:', error.message);
+        return { title: 'Simplified Content', content: 'Unable to simplify content.', keyPoints: [] };
+    }
 };
 
 const generateAIResponse = async (question, chatHistory = []) => {
     try {
-        const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+        const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
         const context = chatHistory
             .slice(-5)
             .map(chat => `User: ${chat.question}\nAssistant: ${chat.answer}`)
@@ -50,76 +89,340 @@ Provide a response and a follow-up question (if appropriate). Format the respons
         const response = await result.response;
         const rawText = response.text();
 
-        // Log raw response for debugging
-        console.log('Raw AI response:', rawText);
+        const cleanedText = cleanJsonResponse(rawText);
+        const fallback = {
+            answer: 'Sorry, I had trouble processing that. Could you rephrase your question?',
+            followUp: 'What else can I help with?'
+        };
+        const parsed = parseJsonSafely(cleanedText, fallback, 'Failed to parse AI response JSON');
 
-        // Clean the response: remove markdown code blocks and extra whitespace
-        let cleanedText = rawText
-            .replace(/```json\s*\n?/, '') // Remove ```json
-            .replace(/```\s*$/, '') // Remove closing ```
-            .replace(/^\s+|\s+$/g, '') // Trim whitespace
-            .replace(/\n/g, ''); // Remove newlines
-
-        // Log cleaned response
-        console.log('Cleaned AI response:', cleanedText);
-
-        // Validate JSON
-        try {
-            const parsedResponse = JSON.parse(cleanedText);
-            if (!parsedResponse.answer) {
-                throw new Error('Parsed response missing "answer" field');
-            }
-            return parsedResponse;
-        } catch (parseError) {
-            console.error('JSON parse error:', parseError.message);
-            // Fallback: return a default response
-            return {
-                answer: 'Sorry, I had trouble processing that. Could you rephrase your question?',
-                followUp: 'What else can I help with?'
-            };
+        if (!parsed.answer) {
+            return fallback;
         }
+        return parsed;
     } catch (error) {
         console.error('generateAIResponse error:', error.message);
-        throw new Error(`AI response generation failed: ${error.message}`);
+        return {
+            answer: 'Sorry, I had trouble processing that. Could you rephrase your question?',
+            followUp: 'What else can I help with?'
+        };
     }
 };
 
 const generateAdaptivePath = async (userId, courseName, difficultyLevel, preferences) => {
-    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
-    const prompt = `Generate a personalized learning path for user ${userId} for the course "${courseName}" with difficulty "${difficultyLevel}". Consider preferences: ${JSON.stringify(preferences)}. Return a JSON object with topics (name, description, resourceLinks), strength, weakness, and duration.`;
-    const result = await model.generateContent(prompt);
-    const response = await result.response;
-    return JSON.parse(response.text());
+    try {
+        const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+        const prompt = `
+Generate a personalized learning path for user ${userId} for the topic "${courseName}" with difficulty "${difficultyLevel}". Break it into 6-8 subtopics. For each subtopic and make it has all real resources and teach user o to 100, provide:
+- name: Subtopic name
+- description: Brief description (1-2 sentences)
+- resourceLinks: Array of 2-3 resources with title and url (YouTube videos, documentation)
+Consider preferences: ${JSON.stringify(preferences)}. Return a JSON object with topics, strength, weakness, and duration (in hours). Example:
+{
+  "topics": [
+    {
+      "name": "Subtopic Name",
+      "description": "Description",
+      "resourceLinks": [
+        { "title": "Resource Title", "url": "https://example.com" }
+      ]
+    }
+  ],
+  "strength": "Strength description",
+  "weakness": "Weakness description",
+  "duration": 10
+}`;
+        const result = await model.generateContent(prompt);
+        const response = await result.response;
+        const rawText = response.text();
+
+        const cleanedText = cleanJsonResponse(rawText);
+        const fallback = {
+            topics: [
+                {
+                    name: `${courseName} Basics`,
+                    description: `Introduction to ${courseName}.`,
+                    resourceLinks: [
+                        { title: `Intro to ${courseName}`, url: 'https://example.com' }
+                    ]
+                }
+            ],
+            strength: 'Basic understanding',
+            weakness: 'Needs deeper exploration',
+            duration: 10
+        };
+        const parsed = parseJsonSafely(cleanedText, fallback, 'Failed to parse adaptive path JSON');
+
+        if (!Array.isArray(parsed.topics) || parsed.topics.length < 1 || typeof parsed.strength !== 'string' || typeof parsed.weakness !== 'string' || typeof parsed.duration !== 'number') {
+            return fallback;
+        }
+
+        // Add order and validate resources
+        parsed.topics = parsed.topics.map((topic, index) => ({
+            name: topic.name || `Subtopic ${index + 1}`,
+            description: topic.description || `Learn about ${topic.name || 'this topic'}.`,
+            resourceLinks: Array.isArray(topic.resourceLinks)
+                ? topic.resourceLinks
+                    .filter(r => r.title && isValidUrl(r.url))
+                    .slice(0, 3)
+                : [{ title: `Intro to ${topic.name || 'Topic'}`, url: 'https://example.com' }],
+            order: index + 1
+        }));
+
+        return parsed;
+    } catch (error) {
+        console.error('generateAdaptivePath error:', error.message);
+        return {
+            topics: [
+                {
+                    name: `${courseName} Basics`,
+                    description: `Introduction to ${courseName}.`,
+                    resourceLinks: [
+                        { title: `Intro to ${courseName}`, url: 'https://example.com' }
+                    ],
+                    order: 1
+                }
+            ],
+            strength: 'Basic understanding',
+            weakness: 'Needs deeper exploration',
+            duration: 10
+        };
+    }
 };
 
-const generateSmartQuiz = async (topicName, difficultyLevel, numQuestions) => {
-    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
-    const prompt = `Generate a quiz for the topic "${topicName}" with ${numQuestions} questions at ${difficultyLevel} difficulty. Each question should have a question, options, correctAnswer, questionType (MCQ/True/False/Short Answer), marks, and aiGeneratedExplanation. Also include duration. Return a JSON object.`;
-    const result = await model.generateContent(prompt);
-    const response = await result.response;
-    return JSON.parse(response.text());
+const generateSmartQuiz = async (topicName, difficultyLevel, numQuestions, quizType) => {
+    try {
+        const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+        const prompt = `
+Generate a ${quizType} quiz for the topic "${topicName}" with ${numQuestions} MCQ questions at ${difficultyLevel} difficulty. Each question must have:
+- question: Question text
+- options: Exactly 4 options
+- correctAnswer: One of the options
+- questionType: "MCQ"
+- marks: 1 for Easy, 2 for Medium, 3 for Hard
+- aiGeneratedExplanation: Explanation for the correct answer
+- subtopic: The specific subtopic within "${topicName}" (e.g., for JavaScript: "Variables", "Functions")
+Include duration (1 minute per question). Return a JSON object:
+{
+  "questions": [
+    {
+      "question": "Question text",
+      "options": ["Option 1", "Option 2", "Option 3", "Option 4"],
+      "correctAnswer": "Option 1",
+      "questionType": "MCQ",
+      "marks": 2,
+      "aiGeneratedExplanation": "Explanation text",
+      "subtopic": "Subtopic Name"
+    }
+  ],
+  "duration": 5
+}`;
+        const result = await model.generateContent(prompt);
+        const response = await result.response;
+        const rawText = response.text();
+
+        const cleanedText = cleanJsonResponse(rawText);
+        const fallback = {
+            questions: [
+                {
+                    question: `What is a basic concept in ${topicName}?`,
+                    options: ['Option 1', 'Option 2', 'Option 3', 'Option 4'],
+                    correctAnswer: 'Option 1',
+                    questionType: 'MCQ',
+                    marks: difficultyLevel === 'Easy' ? 1 : difficultyLevel === 'Medium' ? 2 : 3,
+                    aiGeneratedExplanation: `This is a basic concept in ${topicName}.`,
+                    subtopic: `${topicName} Basics`
+                }
+            ],
+            duration: numQuestions
+        };
+        const parsed = parseJsonSafely(cleanedText, fallback, 'Failed to parse quiz JSON');
+
+        if (!Array.isArray(parsed.questions) || typeof parsed.duration !== 'number') {
+            return fallback;
+        }
+
+        parsed.questions = parsed.questions.filter(question => {
+            if (
+                typeof question.question !== 'string' ||
+                !Array.isArray(question.options) ||
+                question.options.length !== 4 ||
+                typeof question.correctAnswer !== 'string' ||
+                !question.options.includes(question.correctAnswer) ||
+                question.questionType !== 'MCQ' ||
+                typeof question.marks !== 'number' ||
+                typeof question.aiGeneratedExplanation !== 'string' ||
+                typeof question.subtopic !== 'string'
+            ) {
+                return false;
+            }
+            return true;
+        });
+
+        if (parsed.questions.length === 0) {
+            return fallback;
+        }
+
+        return parsed;
+    } catch (error) {
+        console.error('generateSmartQuiz error:', error.message);
+        return {
+            questions: [
+                {
+                    question: `What is a basic concept in ${topicName}?`,
+                    options: ['Option 1', 'Option 2', 'Option 3', 'Option 4'],
+                    correctAnswer: 'Option 1',
+                    questionType: 'MCQ',
+                    marks: difficultyLevel === 'Easy' ? 1 : difficultyLevel === 'Medium' ? 2 : 3,
+                    aiGeneratedExplanation: `This is a basic concept in ${topicName}.`,
+                    subtopic: `${topicName} Basics`
+                }
+            ],
+            duration: numQuestions
+        };
+    }
 };
 
-const generateProgressReport = async (userId, learningPaths, quizzes) => {
-    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
-    const prompt = `Generate a progress report for user ${userId} based on their learning paths: ${JSON.stringify(learningPaths)} and quizzes: ${JSON.stringify(quizzes)}. Include strengths, improvements, recommendations, and a summary. Return a JSON object.`;
-    const result = await model.generateContent(prompt);
-    const response = await result.response;
-    return JSON.parse(response.text());
+const analyzeQuizPerformance = async (topicName, difficultyLevel, responses, questions, quizType) => {
+    try {
+        const totalQuestions = questions.length;
+        const correctAnswers = responses.filter(r => r.isCorrect).length;
+        const incorrectAnswers = totalQuestions - correctAnswers;
+        const scorePercentage = (correctAnswers / totalQuestions) * 100;
+
+        const subtopicPerformance = {};
+        questions.forEach((q, i) => {
+            const subtopic = q.subtopic || 'General';
+            if (!subtopicPerformance[subtopic]) {
+                subtopicPerformance[subtopic] = { correct: 0, total: 0 };
+            }
+            subtopicPerformance[subtopic].total += 1;
+            if (responses[i]?.isCorrect) {
+                subtopicPerformance[subtopic].correct += 1;
+            }
+        });
+
+        const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+        const prompt = `
+Analyze the quiz performance for a ${quizType} quiz on the topic "${topicName}" at ${difficultyLevel} difficulty. Below are the responses, questions, and performance metrics:
+
+Responses: ${JSON.stringify(responses)}
+Questions: ${JSON.stringify(questions)}
+Performance Metrics:
+- Total Questions: ${totalQuestions}
+- Correct Answers: ${correctAnswers} (${scorePercentage.toFixed(1)}%)
+- Incorrect Answers: ${incorrectAnswers}
+- Subtopic Breakdown: ${JSON.stringify(subtopicPerformance)}
+
+Generate:
+- strengths: Highlight strong subtopics (e.g., high accuracy).
+- weaknesses: Identify weak subtopics (e.g., low accuracy).
+- resources: Provide 2-4 resources (title, url) for weak subtopics.
+- remedialSubtopics: If score < 70%, suggest 2-3 remedial subtopics with name, description, and 1-2 resources.
+Return a JSON object:
+{
+  "strengths": "Strength description",
+  "weaknesses": "Weakness description",
+  "resources": [
+    { "title": "Resource Title", "url": "https://example.com" }
+  ],
+  "remedialSubtopics": [
+    {
+      "name": "Subtopic Name",
+      "description": "Description",
+      "resourceLinks": [
+        { "title": "Resource Title", "url": "https://example.com" }
+      ]
+    }
+  ]
+}`;
+        const result = await model.generateContent(prompt);
+        const response = await result.response;
+        const rawText = response.text();
+
+        const cleanedText = cleanJsonResponse(rawText);
+        const fallback = {
+            strengths: correctAnswers > totalQuestions * 0.7
+                ? `You performed well, correctly answering ${correctAnswers}/${totalQuestions} questions.`
+                : 'No specific strengths identified.',
+            weaknesses: incorrectAnswers > 0
+                ? `You struggled with ${incorrectAnswers} questions. Review "${topicName}" to improve.`
+                : 'No specific weaknesses identified.',
+            resources: [
+                { title: `Intro to ${topicName}`, url: 'https://example.com' }
+            ],
+            remedialSubtopics: scorePercentage < 70
+                ? [
+                    {
+                        name: `${topicName} Basics`,
+                        description: `Review core concepts of ${topicName}.`,
+                        resourceLinks: [
+                            { title: `Intro to ${topicName}`, url: 'https://example.com' }
+                        ]
+                    }
+                ]
+                : []
+        };
+        const parsed = parseJsonSafely(cleanedText, fallback, 'Failed to parse performance analysis JSON');
+
+        if (
+            typeof parsed.strengths !== 'string' ||
+            typeof parsed.weaknesses !== 'string' ||
+            !Array.isArray(parsed.resources) ||
+            !Array.isArray(parsed.remedialSubtopics)
+        ) {
+            return fallback;
+        }
+
+        parsed.resources = parsed.resources
+            .filter(r => r.title && isValidUrl(r.url))
+            .slice(0, 4);
+        parsed.remedialSubtopics = parsed.remedialSubtopics
+            .filter(st => st.name && st.description && Array.isArray(st.resourceLinks))
+            .map(st => ({
+                name: st.name,
+                description: st.description,
+                resourceLinks: st.resourceLinks
+                    .filter(r => r.title && isValidUrl(r.url))
+                    .slice(0, 2)
+            }));
+
+        // Add fallback resources if none provided
+        const fallbackResources = {
+            'JavaScript': [
+                { title: 'MDN JavaScript', url: 'https://developer.mozilla.org/en-US/docs/Web/JavaScript' },
+                { title: 'freeCodeCamp JavaScript', url: 'https://www.youtube.com/watch?v=PkZNo7MFNFg' }
+            ],
+            'Mathematics': [
+                { title: 'Khan Academy Algebra', url: 'https://www.khanacademy.org/math/algebra' },
+                { title: '3Blue1Brown', url: 'https://www.youtube.com/@3blue1brown' }
+            ]
+        };
+        if (parsed.resources.length === 0 && fallbackResources[topicName]) {
+            parsed.resources = fallbackResources[topicName].slice(0, 4);
+        }
+
+        return parsed;
+    } catch (error) {
+        console.error('analyzeQuizPerformance error:', error.message);
+        return {
+            strengths: 'No specific strengths identified.',
+            weaknesses: 'No specific weaknesses identified.',
+            resources: [
+                { title: `Intro to ${topicName}`, url: 'https://example.com' }
+            ],
+            remedialSubtopics: []
+        };
+    }
 };
 
 const transcribeAudio = async (audioBuffer, mimetype = 'audio/webm') => {
     try {
-        // Validate buffer size
         if (!audioBuffer || audioBuffer.length < 1024) {
             throw new Error('Audio buffer is empty or too small');
         }
-        console.log('Input audio buffer size:', audioBuffer.length, 'Mimetype:', mimetype);
 
-        // Determine input format based on mimetype
         const inputFormat = mimetype.includes('webm') ? 'webm' : mimetype.split('/')[1] || 'auto';
-
-        // Convert audioBuffer to WAV format
         const wavBuffer = await new Promise((resolve, reject) => {
             const inputStream = new PassThrough();
             const outputStream = new PassThrough();
@@ -138,12 +441,6 @@ const transcribeAudio = async (audioBuffer, mimetype = 'audio/webm') => {
             outputStream.on('error', (err) => reject(err));
         });
 
-        // Save WAV file for debugging
-        const outputWavPath = path.join(__dirname, `output-${Date.now()}.wav`);
-        fs.writeFileSync(outputWavPath, wavBuffer);
-        console.log('WAV buffer size:', wavBuffer.length, 'Saved to:', outputWavPath);
-
-        // Try transcribing with nova-2, fallback to nova if it fails
         let response;
         try {
             response = await deepgram.listen.prerecorded.transcribeFile(
@@ -158,19 +455,16 @@ const transcribeAudio = async (audioBuffer, mimetype = 'audio/webm') => {
             );
         }
 
-        // Log full response
-        console.log('Deepgram Response:', JSON.stringify(response, null, 2));
-
         const { result, error } = response;
         if (error) {
             throw new Error(`Deepgram API error: ${error.message}`);
         }
-        if (!result || !result.results || !result.results.channels || !result.results.channels[0].alternatives || !result.results.channels[0].alternatives[0]) {
-            throw new Error('Deepgram returned an invalid or empty transcription result');
+        if (!result?.results?.channels?.[0]?.alternatives?.[0]) {
+            throw new Error('Deepgram returned an empty transcription result');
         }
         return result.results.channels[0].alternatives[0].transcript || '';
     } catch (error) {
-        console.error('Transcription error:', error);
+        console.error('transcribeAudio error:', error.message);
         throw new Error(`Deepgram transcription error: ${error.message}`);
     }
 };
@@ -183,9 +477,9 @@ const synthesizeSpeech = async (text, outputFile) => {
         );
         const audioBuffer = Buffer.from(await result.arrayBuffer());
         fs.writeFileSync(outputFile, audioBuffer);
-        
         return outputFile;
     } catch (error) {
+        console.error('synthesizeSpeech error:', error.message);
         throw new Error(`Deepgram text-to-speech error: ${error.message}`);
     }
 };
@@ -195,7 +489,7 @@ module.exports = {
     generateAIResponse,
     generateAdaptivePath,
     generateSmartQuiz,
-    generateProgressReport,
+    analyzeQuizPerformance,
     transcribeAudio,
     synthesizeSpeech
 };

@@ -1,4 +1,3 @@
-import React from 'react';
 import { useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Routes, Route } from 'react-router-dom';
@@ -14,6 +13,7 @@ import DailyQuizPage from './Pages/Quiz/DailyQuizPage';
 import Sidebar from './Components/Sidebar';
 import OnbordingProcess from './Pages/Onboarding/OnboardingProcess';
 import Recognition from './Pages/Recognition/Recognition';
+import LearnFlow from './Pages/LearnFlow/LearnFlow';
 
 function App() {
   const navigate = useNavigate();
@@ -24,21 +24,17 @@ function App() {
     const tokenFromUrl = urlParams.get('token');
     const tokenFromStorage = localStorage.getItem('token');
 
-    // List of public routes that don't require a token
-    const publicRoutes = ['/', '/login','/recognition'];
+    const publicRoutes = ['/', '/login'];
 
     if (tokenFromUrl) {
-      // If token is provided in URL, store it and redirect to profile
       localStorage.setItem('token', tokenFromUrl);
       navigate('/profile', { replace: true });
     } else if (!tokenFromStorage && !publicRoutes.includes(location.pathname)) {
-      // If no token and trying to access a protected route, redirect to login
       navigate('/login', { replace: true });
     }
   }, [location, navigate]);
 
-  // Hide sidebar for Landing and Login pages
-  const showSidebar = !['/', '/login','/onboarding'].includes(location.pathname);
+  const showSidebar = !['/', '/login', '/onboarding'].includes(location.pathname);
 
   return (
     <div className="flex min-h-screen">
@@ -54,6 +50,7 @@ function App() {
           <Route path="/profile" element={<Profile />} />
           <Route path="/chatbot" element={<Chatbot />} />
           <Route path="/recognition" element={<Recognition />} />
+          <Route path="/learnflow/:learningPathId" element={<LearnFlow />} />
         </Routes>
       </div>
     </div>

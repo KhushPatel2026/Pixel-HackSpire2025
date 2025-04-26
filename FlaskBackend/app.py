@@ -6,10 +6,6 @@ from dotenv import load_dotenv
 from pypdf import PdfReader
 import google.generativeai as genai
 import json
-import numpy as np
-from pinecone import Pinecone, ServerlessSpec
-from langchain.text_splitter import RecursiveCharacterTextSplitter
-import time
 
 app = Flask(__name__)
 CORS(app)
@@ -19,18 +15,11 @@ print("Starting Flask application...")
 # Load environment variables before anything else
 load_dotenv()
 
-# Configure API keys and check if they exist
+# Configure API key and check if it exists
 GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
-PINECONE_API_KEY = os.getenv('PINECONE_API_KEY')
-PINECONE_ENV = os.getenv('PINECONE_ENV')
-PINECONE_INDEX_NAME = os.getenv('PINECONE_INDEX_NAME', 'pdf-embeddings')
 
 if not GEMINI_API_KEY:
     raise ValueError("GEMINI_API_KEY not found in environment variables")
-if not PINECONE_API_KEY:
-    raise ValueError("PINECONE_API_KEY not found in environment variables")
-if not PINECONE_ENV:
-    raise ValueError("PINECONE_ENV not found in environment variables")
 
 # Initialize Gemini
 print("Configuring Gemini API...")
@@ -143,9 +132,8 @@ app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
 
 def process_pdf(file_path):
-    """Process PDF and create vector store in Pinecone"""
+    """Process PDF and get summary from Gemini"""
     print(f"Starting to process PDF: {file_path}")
-    
     # Read PDF
     pdf_reader = PdfReader(file_path)
     text = ""
@@ -314,8 +302,9 @@ def chat():
         }), 200
         
     except Exception as e:
-        print(f"Error in chat endpoint: {str(e)}")
-        return jsonify({'error': str(e)}), 500
+        print(f"Error during Gemini API call: {str(e)}")
+        print(f"Full error details: {repr(e)}")
+        raise Exception(f"Failed to generate summary: {str(e)}")
 
 @app.route('/upload', methods=['POST'])
 def upload_file():
@@ -346,8 +335,7 @@ def upload_file():
             return jsonify({
                 'message': 'File processed successfully',
                 'summary': result['summary'],
-                'page_count': result['page_count'],
-                'chunk_count': result['chunk_count']
+                'page_count': result['page_count']
             }), 200
             
         except Exception as e:

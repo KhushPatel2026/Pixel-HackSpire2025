@@ -58,9 +58,9 @@ function AuthComponent() {
                 toast.success(`${isLogin ? 'Login' : 'Registration'} successful!`);
                 setTimeout(() => {
                     if(isLogin==='Login') {
-                    window.location.href = '/profile';
+                    window.location.href = '/dashboard';
                     } else {
-                    window.location.href = '/onboarding';
+                    window.location.href = '/chatbot';
                     }
                 }, 1500);
             } else {

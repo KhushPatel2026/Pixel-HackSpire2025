@@ -1,7 +1,19 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { motion } from 'framer-motion';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
+import { User, Lock } from 'lucide-react';
+
+// Mock stars data for background
+const stars = Array.from({ length: 100 }, (_, i) => ({
+  id: i,
+  x: Math.random() * 100,
+  y: Math.random() * 100,
+  size: Math.random() * 3 + 1,
+  opacity: Math.random() * 0.5 + 0.5,
+  blinking: Math.random() > 0.7,
+}));
 
 const Profile = () => {
   const [profile, setProfile] = useState(null);
@@ -38,7 +50,7 @@ const Profile = () => {
 
     const fetchProfile = async (retryCount = 0) => {
       try {
-        const response = await fetch('http://localhost:3000/api/profile', {
+        const response = await fetch('http://localhost:3000/api/profile/profile', {
           headers: { 'x-access-token': token },
         });
 
@@ -188,174 +200,285 @@ const Profile = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-900 via-black to-gray-900">
-        <div className="text-white text-xl">Loading...</div>
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#0a1a0a] via-[#0d150d] to-[#091409] text-white">
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.6 }}
+          className="text-xl"
+        >
+          Loading...
+        </motion.div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-900 via-black to-gray-900 p-4">
-      <div className="w-full max-w-md p-8 bg-white/10 backdrop-blur-lg rounded-2xl shadow-2xl border border-white/20">
-        <h1 className="text-3xl font-bold text-white text-center mb-8 bg-gradient-to-r from-gray-200 to-white bg-clip-text text-transparent">
-          User Profile
-        </h1>
-
-        {profile && (
-          <div className="space-y-4 text-gray-300 mb-6">
-            <p><span className="font-semibold text-white">Name:</span> {profile.name}</p>
-            <p><span className="font-semibold text-white">Email:</span> {profile.email}</p>
-            <p><span className="font-semibold text-white">Difficulty Level:</span> {profile.learningPreferences?.preferredDifficulty || 'Not set'}</p>
-            <p><span className="font-semibold text-white">Learning Style:</span> {profile.learningPreferences?.preferredLearningStyle || 'Not set'}</p>
-            <p><span className="font-semibold text-white">Daily Study Time:</span> {profile.learningPreferences?.dailyStudyTime ? `${profile.learningPreferences.dailyStudyTime} mins` : 'Not set'}</p>
-          </div>
-        )}
-
-        <form onSubmit={handleEditProfile} className="space-y-6">
-          <div>
-            <input
-              type="text"
-              name="name"
-              placeholder="Name"
-              defaultValue={profile?.name}
-              required
-              aria-label="Name"
-              className="w-full px-4 py-3 bg-gray-800/50 border border-gray-700 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:border-transparent transition-all duration-300"
-            />
-            {errors.name && <p className="text-red-400 text-sm mt-1">{errors.name}</p>}
-          </div>
-          <div>
-            <input
-              type="email"
-              name="email"
-              placeholder="Email"
-              defaultValue={profile?.email}
-              required
-              aria-label="Email"
-              className="w-full px-4 py-3 bg-gray-800/50 border border-gray-700 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:border-transparent transition-all duration-300"
-            />
-            {errors.email && <p className="text-red-400 text-sm mt-1">{errors.email}</p>}
-          </div>
-          <div>
-            <select
-              name="preferredDifficulty"
-              defaultValue={profile?.learningPreferences?.preferredDifficulty || ''}
-              aria-label="Preferred Difficulty"
-              className="w-full px-4 py-3 bg-gray-800/50 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-gray-500 focus:border-transparent transition-all duration-300"
-            >
-              <option value="">Select Difficulty</option>
-              <option value="Easy">Easy</option>
-              <option value="Medium">Medium</option>
-              <option value="Hard">Hard</option>
-            </select>
-          </div>
-          <div>
-            <select
-              name="preferredLearningStyle"
-              defaultValue={profile?.learningPreferences?.preferredLearningStyle || ''}
-              aria-label="Preferred Learning Style"
-              className="w-full px-4 py-3 bg-gray-800/50 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-gray-500 focus:border-transparent transition-all duration-300"
-            >
-              <option value="">Select Learning Style</option>
-              <option value="Visual">Visual</option>
-              <option value="Auditory">Auditory</option>
-              <option value="Reading/Writing">Reading/Writing</option>
-              <option value="Kinesthetic">Kinesthetic</option>
-            </select>
-          </div>
-          <div>
-            <input
-              type="number"
-              name="dailyStudyTime"
-              placeholder="Daily Study Time (minutes)"
-              defaultValue={profile?.learningPreferences?.dailyStudyTime || ''}
-              aria-label="Daily Study Time"
-              className="w-full px-4 py-3 bg-gray-800/50 border border-gray-700 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:border-transparent transition-all duration-300"
-            />
-            {errors.dailyStudyTime && <p className="text-red-400 text-sm mt-1">{errors.dailyStudyTime}</p>}
-          </div>
-          <button
-            type="submit"
-            aria-label="Save Profile Changes"
-            className="w-full py-3 bg-gradient-to-r from-gray-700 to-gray-900 text-white rounded-lg font-semibold hover:from-gray-600 hover:to-gray-800 transition-all duration-300 transform hover:-translate-y-1 hover:shadow-lg"
-          >
-            Save Changes
-          </button>
-        </form>
-
-        <button
-          onClick={() => setIsPasswordModalOpen(true)}
-          aria-label="Change Password"
-          className="w-full mt-4 py-3 bg-white/5 border border-white/20 text-white rounded-lg font-semibold hover:bg-white/10 transition-all duration-300"
-        >
-          Change Password
-        </button>
+    <div className="min-h-screen flex flex-col bg-gradient-to-br from-[#0a1a0a] via-[#0d150d] to-[#091409] text-white p-4 overflow-hidden">
+      {/* Stars background */}
+      <div className="fixed inset-0 z-0 overflow-hidden">
+        {stars.map((star) => (
+          <div
+            key={star.id}
+            className={`absolute rounded-full bg-green-200 ${star.blinking ? 'animate-pulse' : ''}`}
+            style={{
+              left: `${star.x}%`,
+              top: `${star.y}%`,
+              width: `${star.size}px`,
+              height: `${star.size}px`,
+              opacity: star.opacity,
+            }}
+          />
+        ))}
       </div>
 
-      {isPasswordModalOpen && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4">
-          <div className="w-full max-w-md p-8 bg-white/10 backdrop-blur-lg rounded-2xl shadow-2xl border border-white/20">
-            <h2 className="text-2xl font-bold text-white mb-6">Change Password</h2>
-            <form onSubmit={handlePasswordChange} className="space-y-6">
-              <div>
-                <input
-                  type="password"
-                  value={passwordData.currentPassword}
-                  onChange={(e) => setPasswordData({ ...passwordData, currentPassword: e.target.value })}
-                  placeholder="Current Password"
-                  required
-                  aria-label="Current Password"
-                  className="w-full px-4 py-3 bg-gray-800/50 border border-gray-700 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:border-transparent transition-all duration-300"
-                />
-                {errors.currentPassword && <p className="text-red-400 text-sm mt-1">{errors.currentPassword}</p>}
+      {/* Mesh gradient overlays */}
+      <div className="fixed inset-0 z-0 bg-gradient-radial from-[#0d400d80] via-transparent to-transparent opacity-50" />
+      <div className="fixed inset-0 z-0 bg-gradient-radial from-[#1e8f1e80] via-transparent to-transparent opacity-50 translate-x-1/2" />
+      <div className="fixed inset-0 z-0 bg-gradient-radial from-[#00510080] via-transparent to-transparent opacity-40 translate-y-1/4" />
+
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.6 }}
+        className="max-w-5xl w-full mx-auto bg-[#0a1a0a]/90 backdrop-blur-lg rounded-2xl shadow-2xl border border-green-500/20 p-6 relative z-10"
+      >
+        {/* Decorative elements */}
+        <div className="absolute -right-20 top-0 w-40 h-40 rounded-full bg-gradient-to-r from-emerald-600/20 to-green-600/20 blur-3xl z-0" />
+        <div className="absolute -left-20 bottom-0 w-40 h-40 rounded-full bg-gradient-to-r from-green-600/20 to-emerald-600/20 blur-3xl z-0" />
+
+        {/* Header */}
+        <div className="mb-6 flex flex-col md:flex-row items-center justify-between">
+          <motion.h1
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.6, delay: 0.2 }}
+            className="text-3xl font-bold text-center mb-4 md:mb-0 bg-clip-text text-transparent bg-gradient-to-r from-green-400 to-emerald-400"
+          >
+            Welcome, {profile?.name}
+          </motion.h1>
+
+          <motion.button
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            onClick={() => navigate('/')}
+            className="py-2 px-4 bg-[#0d1f0d]/50 border border-green-900/50 text-white rounded-lg font-semibold hover:bg-[#0d1f0d]/70 transition-all duration-300"
+          >
+            Back to Home
+          </motion.button>
+        </div>
+
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.6, delay: 0.4 }}
+        >
+          <div className="flex flex-col md:flex-row gap-8">
+            <div className="md:w-1/3 flex flex-col items-center">
+              <div className="w-32 h-32 bg-gradient-to-br from-green-600 to-emerald-600 rounded-full flex items-center justify-center text-4xl mb-4">
+                {profile?.name.charAt(0).toUpperCase()}
               </div>
-              <div>
-                <input
-                  type="password"
-                  value={passwordData.newPassword}
-                  onChange={(e) => setPasswordData({ ...passwordData, newPassword: e.target.value })}
-                  placeholder="New Password"
-                  required
-                  aria-label="New Password"
-                  className="w-full px-4 py-3 bg-gray-800/50 border border-gray-700 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:border-transparent transition-all duration-300"
-                />
-                {errors.newPassword && <p className="text-red-400 text-sm mt-1">{errors.newPassword}</p>}
-              </div>
-              <div>
-                <input
-                  type="password"
-                  value={passwordData.confirmPassword}
-                  onChange={(e) => setPasswordData({ ...passwordData, confirmPassword: e.target.value })}
-                  placeholder="Confirm New Password"
-                  required
-                  aria-label="Confirm New Password"
-                  className="w-full px-4 py-3 bg-gray-800/50 border border-gray-700 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:border-transparent transition-all duration-300"
-                />
-                {errors.confirmPassword && <p className="text-red-400 text-sm mt-1">{errors.confirmPassword}</p>}
-              </div>
-              <div className="flex gap-4">
-                <button
-                  type="submit"
-                  aria-label="Update Password"
-                  className="flex-1 py-3 bg-gradient-to-r from-gray-700 to-gray-900 text-white rounded-lg font-semibold hover:from-gray-600 hover:to-gray-800 transition-all duration-300"
-                >
-                  Update Password
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsPasswordModalOpen(false);
-                    setErrors({});
-                    setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' });
-                  }}
-                  aria-label="Cancel"
-                  className="flex-1 py-3 bg-white/5 border border-white/20 text-white rounded-lg font-semibold hover:bg-white/10 transition-all duration-300"
-                >
-                  Cancel
-                </button>
-              </div>
-            </form>
+            </div>
+
+            <div className="md:w-2/3">
+              {profile && (
+                <div className="space-y-4 text-gray-300 mb-6">
+                  <p><span className="font-semibold text-white">Name:</span> {profile.name}</p>
+                  <p><span className="font-semibold text-white">Email:</span> {profile.email}</p>
+                  <p><span className="font-semibold text-white">Difficulty Level:</span> {profile.learningPreferences?.preferredDifficulty || 'Not set'}</p>
+                  <p><span className="font-semibold text-white">Learning Style:</span> {profile.learningPreferences?.preferredLearningStyle || 'Not set'}</p>
+                  <p><span className="font-semibold text-white">Daily Study Time:</span> {profile.learningPreferences?.dailyStudyTime ? `${profile.learningPreferences.dailyStudyTime} mins` : 'Not set'}</p>
+                </div>
+              )}
+
+              <form onSubmit={handleEditProfile} className="space-y-6">
+                <div>
+                  <label className="block text-gray-400 mb-1 text-sm">Name</label>
+                  <div className="relative">
+                    <User className="absolute left-4 top-3.5 h-5 w-5 text-green-500" />
+                    <input
+                      type="text"
+                      name="name"
+                      placeholder="Name"
+                      defaultValue={profile?.name}
+                      required
+                      aria-label="Name"
+                      className="w-full px-12 py-3 bg-[#0d1f0d]/50 border border-green-900/50 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500/50 focus:border-transparent transition-all duration-300"
+                    />
+                  </div>
+                  {errors.name && <p className="text-red-400 text-sm mt-1">{errors.name}</p>}
+                </div>
+                <div>
+                  <label className="block text-gray-400 mb-1 text-sm">Email</label>
+                  <div className="relative">
+                    <User className="absolute left-4 top-3.5 h-5 w-5 text-green-500" />
+                    <input
+                      type="email"
+                      name="email"
+                      placeholder="Email"
+                      defaultValue={profile?.email}
+                      required
+                      aria-label="Email"
+                      className="w-full px-12 py-3 bg-[#0d1f0d]/50 border border-green-900/50 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500/50 focus:border-transparent transition-all duration-300"
+                    />
+                  </div>
+                  {errors.email && <p className="text-red-400 text-sm mt-1">{errors.email}</p>}
+                </div>
+                <div>
+                  <label className="block text-gray-400 mb-1 text-sm">Preferred Difficulty</label>
+                  <select
+                    name="preferredDifficulty"
+                    defaultValue={profile?.learningPreferences?.preferredDifficulty || ''}
+                    aria-label="Preferred Difficulty"
+                    className="w-full px-4 py-3 bg-[#0d1f0d]/50 border border-green-900/50 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-green-500/50 focus:border-transparent transition-all duration-300"
+                  >
+                    <option value="">Select Difficulty</option>
+                    <option value="Easy">Easy</option>
+                    <option value="Medium">Medium</option>
+                    <option value="Hard">Hard</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-gray-400 mb-1 text-sm">Preferred Learning Style</label>
+                  <select
+                    name="preferredLearningStyle"
+                    defaultValue={profile?.learningPreferences?.preferredLearningStyle || ''}
+                    aria-label="Preferred Learning Style"
+                    className="w-full px-4 py-3 bg-[#0d1f0d]/50 border border-green-900/50 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-green-500/50 focus:border-transparent transition-all duration-300"
+                  >
+                    <option value="">Select Learning Style</option>
+                    <option value="Visual">Visual</option>
+                    <option value="Auditory">Auditory</option>
+                    <option value="Reading/Writing">Reading/Writing</option>
+                    <option value="Kinesthetic">Kinesthetic</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-gray-400 mb-1 text-sm">Daily Study Time (minutes)</label>
+                  <input
+                    type="number"
+                    name="dailyStudyTime"
+                    placeholder="Daily Study Time (minutes)"
+                    defaultValue={profile?.learningPreferences?.dailyStudyTime || ''}
+                    aria-label="Daily Study Time"
+                    className="w-full px-4 py-3 bg-[#0d1f0d]/50 border border-green-900/50 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500/50 focus:border-transparent transition-all duration-300"
+                  />
+                  {errors.dailyStudyTime && <p className="text-red-400 text-sm mt-1">{errors.dailyStudyTime}</p>}
+                </div>
+                <div className="flex gap-4">
+                  <motion.button
+                    type="submit"
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    aria-label="Save Profile Changes"
+                    className="flex-1 py-3 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-lg font-semibold hover:from-green-500 hover:to-emerald-500 transition-all duration-300 transform hover:shadow-[0_0_15px_rgba(16,185,129,0.5)]"
+                  >
+                    Save Changes
+                  </motion.button>
+                  <motion.button
+                    type="button"
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    onClick={() => setIsPasswordModalOpen(true)}
+                    aria-label="Change Password"
+                    className="flex-1 py-3 bg-[#0d1f0d]/50 border border-green-900/50 text-white rounded-lg font-semibold hover:bg-[#0d1f0d]/70 transition-all duration-300"
+                  >
+                    Change Password
+                  </motion.button>
+                </div>
+              </form>
+            </div>
           </div>
+        </motion.div>
+      </motion.div>
+
+      {isPasswordModalOpen && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6 }}
+            className="w-full max-w-md p-1 bg-gradient-to-tr from-[#0d1f0d] to-[#153515] rounded-2xl shadow-2xl relative z-10"
+          >
+            <div className="bg-[#0a1a0a]/90 backdrop-blur-lg p-8 rounded-2xl border border-green-500/20 relative overflow-hidden">
+              <div className="absolute -right-20 top-0 w-40 h-40 rounded-full bg-gradient-to-r from-emerald-600/20 to-green-600/20 blur-3xl z-0" />
+              <div className="absolute -left-20 bottom-0 w-40 h-40 rounded-full bg-gradient-to-r from-green-600/20 to-emerald-600/20 blur-3xl z-0" />
+
+              <h2 className="text-2xl font-bold text-white mb-6">Change Password</h2>
+              <form onSubmit={handlePasswordChange} className="space-y-6">
+                <div>
+                  <div className="relative">
+                    <Lock className="absolute left-4 top-3.5 h-5 w-5 text-green-500" />
+                    <input
+                      type="password"
+                      value={passwordData.currentPassword}
+                      onChange={(e) => setPasswordData({ ...passwordData, currentPassword: e.target.value })}
+                      placeholder="Current Password"
+                      required
+                      aria-label="Current Password"
+                      className="w-full px-12 py-3 bg-[#0d1f0d]/50 border border-green-900/50 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500/50 focus:border-transparent transition-all duration-300"
+                    />
+                  </div>
+                  {errors.currentPassword && <p className="text-red-400 text-sm mt-1">{errors.currentPassword}</p>}
+                </div>
+                <div>
+                  <div className="relative">
+                    <Lock className="absolute left-4 top-3.5 h-5 w-5 text-green-500" />
+                    <input
+                      type="password"
+                      value={passwordData.newPassword}
+                      onChange={(e) => setPasswordData({ ...passwordData, newPassword: e.target.value })}
+                      placeholder="New Password"
+                      required
+                      aria-label="New Password"
+                      className="w-full px-12 py-3 bg-[#0d1f0d]/50 border border-green-900/50 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500/50 focus:border-transparent transition-all duration-300"
+                    />
+                  </div>
+                  {errors.newPassword && <p className="text-red-400 text-sm mt-1">{errors.newPassword}</p>}
+                </div>
+                <div>
+                  <div className="relative">
+                    <Lock className="absolute left-4 top-3.5 h-5 w-5 text-green-500" />
+                    <input
+                      type="password"
+                      value={passwordData.confirmPassword}
+                      onChange={(e) => setPasswordData({ ...passwordData, confirmPassword: e.target.value })}
+                      placeholder="Confirm New Password"
+                      required
+                      aria-label="Confirm New Password"
+                      className="w-full px-12 py-3 bg-[#0d1f0d]/50 border border-green-900/50 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500/50 focus:border-transparent transition-all duration-300"
+                    />
+                  </div>
+                  {errors.confirmPassword && <p className="text-red-400 text-sm mt-1">{errors.confirmPassword}</p>}
+                </div>
+                <div className="flex gap-4">
+                  <motion.button
+                    type="submit"
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    aria-label="Update Password"
+                    className="flex-1 py-3 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-lg font-semibold hover:from-green-500 hover:to-emerald-500 transition-all duration-300 transform hover:shadow-[0_0_15px_rgba(16,185,129,0.5)]"
+                  >
+                    Update Password
+                  </motion.button>
+                  <motion.button
+                    type="button"
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    onClick={() => {
+                      setIsPasswordModalOpen(false);
+                      setErrors({});
+                      setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' });
+                    }}
+                    aria-label="Cancel"
+                    className="flex-1 py-3 bg-[#0d1f0d]/50 border border-green-900/50 text-white rounded-lg font-semibold hover:bg-[#0d1f0d]/70 transition-all duration-300"
+                  >
+                    Cancel
+                  </motion.button>
+                </div>
+              </form>
+            </div>
+          </motion.div>
         </div>
       )}
 
