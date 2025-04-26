@@ -215,17 +215,38 @@ def process_pdf(file_path):
         raise
     
     # Generate initial summary
-    summary_prompt = f"""Please provide a comprehensive summary of the following document. Include:
-1. Main topics and key points
-2. Important findings or conclusions
-3. Any significant data or statistics
-4. Key recommendations (if any)
+    summary_prompt = f"""Please provide a comprehensive summary of the following document. Format your response using these rules:
+1. Use ** ** for bold text (e.g., **Important Topic**)
+2. Use single * at the start of a line for bullet points
+3. Use clear section headers in bold (e.g., **1. Main Topics and Key Points:**)
+4. Organize the content with proper spacing between sections
+
+Include:
+**1. Main Topics and Key Points:**
+* Key topics and main ideas
+* Important concepts discussed
+* Core arguments or themes
+
+**2. Important Findings or Conclusions:**
+* Major findings
+* Key conclusions
+* Significant results
+
+**3. Significant Data or Statistics:**
+* Notable numbers or percentages
+* Important measurements
+* Key metrics
+
+**4. Key Recommendations:**
+* Main suggestions
+* Action items
+* Future directions
 
 Document text:
-{text[:5000]}  # Using first 5000 chars for summary
-
-Please structure the summary in a clear, organized manner."""
+{text[:5000]}  # Using first 5000 chars for summary"""
+    
     response = model.generate_content(summary_prompt)
+    
     return {
         'summary': response.text,
         'page_count': len(pdf_reader.pages),
@@ -248,7 +269,28 @@ def get_relevant_chunks(query, top_k=3):
         
         # Extract chunks from results
         chunks = [match.metadata['text'] for match in results.matches]
-        return chunks
+        
+        # Prepare context and generate response
+        context = "\n\n".join(chunks)
+        
+        prompt = f"""Based on the following context, please answer the question. Format your response using these rules:
+1. Use ** ** for bold text (e.g., **Important Point**)
+2. Use single * at the start of a line for bullet points
+3. If listing multiple items, use bullet points
+4. If the answer cannot be found in the context, say "I cannot find information about this in the document."
+
+Context:
+{context}
+
+Question: {query}
+
+Answer:"""
+        
+        # Generate response
+        response = model.generate_content(prompt)
+        
+        return chunks, response.text
+        
     except Exception as e:
         print(f"Error retrieving chunks: {str(e)}")
         raise
@@ -263,26 +305,12 @@ def chat():
         question = data['question']
         print(f"Received question: {question}")
         
-        # Get relevant chunks
-        relevant_chunks = get_relevant_chunks(question)
-        context = "\n\n".join(relevant_chunks)
-        
-        # Prepare prompt
-        prompt = f"""Based on the following context, please answer the question. If the answer cannot be found in the context, say "I cannot find information about this in the document."
-
-Context:
-{context}
-
-Question: {question}
-
-Answer:"""
-        
-        # Generate response
-        response = model.generate_content(prompt)
+        # Get relevant chunks and generate response
+        chunks, answer = get_relevant_chunks(question)
         
         return jsonify({
-            'answer': response.text,
-            'context': relevant_chunks  # Optional: return context for debugging
+            'answer': answer,
+            'context': chunks  # Optional: return context for debugging
         }), 200
         
     except Exception as e:

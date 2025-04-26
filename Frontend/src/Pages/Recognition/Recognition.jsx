@@ -2,6 +2,22 @@ import { useState } from 'react';
 import axios from 'axios';
 import { BookOpen } from 'lucide-react';
 
+// Utility function to format text with markdown-style syntax
+const formatText = (text) => {
+  if (!text) return '';
+  
+  // Replace ** ** with bold text
+  text = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+  
+  // Replace single * with bullet points
+  text = text.replace(/^\* (.+)$/gm, '• $1');
+  
+  // Convert newlines to <br> tags
+  text = text.split('\n').map(line => line.trim()).join('<br>');
+  
+  return text;
+};
+
 export default function DocumentChat() {
   const [file, setFile] = useState(null);
   const [question, setQuestion] = useState('');
@@ -183,7 +199,10 @@ export default function DocumentChat() {
             <h2 className="text-xl font-bold mb-2 bg-clip-text text-transparent bg-gradient-to-r from-green-400 to-emerald-400">
               Document Summary
             </h2>
-            <p className="text-gray-300 mb-4 whitespace-pre-line">{summary}</p>
+            <p 
+              className="text-gray-300 mb-4 prose prose-invert"
+              dangerouslySetInnerHTML={{ __html: formatText(summary) }}
+            />
           </div>
         )}
 
@@ -203,7 +222,10 @@ export default function DocumentChat() {
                   </div>
                   <div className="bg-[#0d1f0d] p-3 rounded-xl">
                     <p className="font-semibold text-emerald-400">Answer:</p>
-                    <p className="text-gray-300 whitespace-pre-line">{chat.answer}</p>
+                    <p 
+                      className="text-gray-300 prose prose-invert"
+                      dangerouslySetInnerHTML={{ __html: formatText(chat.answer) }}
+                    />
                   </div>
                 </div>
               ))}
@@ -231,7 +253,7 @@ export default function DocumentChat() {
             </div>
           </div>
         )}
-          </main>
+      </main>
     </div>
   );
 }
