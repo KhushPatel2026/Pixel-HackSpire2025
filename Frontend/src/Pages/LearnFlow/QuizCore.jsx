@@ -22,6 +22,10 @@ export default function QuizCore({
   resetQuiz
 }) {
   const handleOptionChange = (index, value) => {
+    if (index < 0 || index >= (quiz?.questions?.length || 0)) {
+      console.error(`Invalid question index: ${index}`);
+      return;
+    }
     const updatedResponses = [...responses];
     updatedResponses[index] = value;
     setResponses(updatedResponses);
@@ -242,93 +246,82 @@ export default function QuizCore({
           transition={{ duration: 0.6, delay: 0.3 }}
           className="space-y-6"
         >
+          {console.log('Result object:', JSON.stringify(result, null, 2))}
           <div className="p-6 bg-[#0d1f0d]/30 border border-green-900/30 rounded-lg shadow-lg">
-            <div className="flex justify-center mb-4">
-              <div className="h-20 w-20 rounded-full bg-gradient-to-r from-green-600/30 to-emerald-600/30 flex items-center justify-center">
-                <span className="text-2xl font-bold text-green-400">
-                  {result.quiz?.quizScore || 0}
-                </span>
-              </div>
-            </div>
-            
-            <h2 className="text-xl font-bold mb-2 text-center text-green-300">
-              Result: {result.quiz?.quizResult || 'N/A'}
-            </h2>
-            
-            <div className="mt-8 space-y-6">
-              <div>
-                <h3 className="text-lg font-semibold mb-4 flex items-center gap-2 text-green-400">
-                  <Award className="h-5 w-5" />
-                  Feedback:
-                </h3>
-                <ul className="space-y-3">
-                  {result.quiz?.responses?.map((resp, index) => (
-                    <motion.li
-                      key={index}
-                      initial={{ opacity: 0, x: -10 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ duration: 0.3, delay: 0.1 * index }}
-                      className={`p-3 rounded-lg ${resp.isCorrect ? 'bg-green-900/20 border border-green-600/30' : 'bg-red-900/20 border border-red-600/30'}`}
-                    >
-                      <strong className={resp.isCorrect ? 'text-green-400' : 'text-red-400'}>
-                        Question {index + 1}:
-                      </strong>{' '}
-                      <span className="text-gray-300">{resp.question}</span>
-                      <p className="text-gray-300 mt-1">{resp.feedback || 'No feedback available.'}</p>
-                      {!resp.isCorrect && resp.resources?.length > 0 && (
-                        <div className="mt-2">
-                          <p className="text-green-400 font-medium">Recommended Resources:</p>
-                          <ul className="space-y-1 mt-1">
-                            {resp.resources.map((resource, rIdx) => (
-                              <li key={rIdx}>
-                                <a
-                                  href={resource.url}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="text-green-400 hover:underline flex items-center gap-2"
-                                >
-                                  <Link className="h-4 w-4" />
-                                  {resource.title}
-                                </a>
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                      )}
-                    </motion.li>
-                  )) || (
-                    <li className="text-gray-400">No feedback available.</li>
-                  )}
-                </ul>
-              </div>
+            {!result.quiz ? (
+              <p className="text-red-400 text-center">Error: Quiz result data is missing.</p>
+            ) : (
+              <>
+                <div className="flex justify-center mb-4">
+                  <div className="h-20 w-20 rounded-full bg-gradient-to-r from-green-600/30 to-emerald-600/30 flex items-center justify-center">
+                    <span className="text-2xl font-bold text-green-400">
+                      {result.quiz.quizScore !== undefined ? result.quiz.quizScore : 'N/A'}
+                    </span>
+                  </div>
+                </div>
+                
+                <h2 className="text-xl font-bold mb-2 text-center text-green-300">
+                  Result: {result.quiz.quizResult || 'N/A'}
+                </h2>
+                
+                <div className="mt-8 space-y-6">
+                  <div>
+                    <h3 className="text-lg font-semibold mb-4 flex items-center gap-2 text-green-400">
+                      <Award className="h-5 w-5" />
+                      Strengths
+                    </h3>
+                    <p className="text-gray-300">
+                      {result.quiz.strengths || 'No specific strengths identified.'}
+                    </p>
+                  </div>
 
-              <div>
-                <h3 className="text-lg font-semibold mb-4 flex items-center gap-2 text-green-400">
-                  <Award className="h-5 w-5" />
-                  Strengths:
-                </h3>
-                <p className="text-gray-300">{result.quiz?.strengths || 'No specific strengths identified.'}</p>
-              </div>
+                  <div>
+                    <h3 className="text-lg font-semibold mb-4 flex items-center gap-2 text-green-400">
+                      <Award className="h-5 w-5" />
+                      Weaknesses
+                    </h3>
+                    <p className="text-gray-300">
+                      {result.quiz.weaknesses || 'No specific weaknesses identified.'}
+                    </p>
+                  </div>
 
-              <div>
-                <h3 className="text-lg font-semibold mb-4 flex items-center gap-2 text-green-400">
-                  <Award className="h-5 w-5" />
-                  Weaknesses:
-                </h3>
-                <p className="text-gray-300">{result.quiz?.weaknesses || 'No specific weaknesses identified.'}</p>
-              </div>
-            </div>
+                  <div>
+                    <h3 className="text-lg font-semibold mb-4 flex items-center gap-2 text-green-400">
+                      <Award className="h-5 w-5" />
+                      Recommended Resources
+                    </h3>
+                    {result.quiz.resources && result.quiz.resources.length > 0 ? (
+                      <ul className="space-y-2">
+                        {result.quiz.resources.map((resource, idx) => (
+                          <li key={idx}>
+                            <a
+                              href={resource.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-green-400 hover:underline flex items-center gap-2"
+                            >
+                              <Link className="h-4 w-4" />
+                              {resource.title}
+                            </a>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="text-gray-300">No resources available.</p>
+                    )}
+                  </div>
+                </div>
+              </>
+            )}
           </div>
 
           <motion.button
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
-            className="w-full py-3 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 text-white rounded-lg font-semibold transition-all duration-300 transform hover:shadow-[0_0_15px_rgba(16,185,129,0.5)] flex items-center justify-center gap-2"
             onClick={resetQuiz}
-            disabled={loading}
+            className="w-full py-3 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 rounded-lg font-medium text-center"
           >
-            <Award className="h-5 w-5" />
-            Continue Learning
+            Return to Learning Path
           </motion.button>
         </motion.div>
       )}

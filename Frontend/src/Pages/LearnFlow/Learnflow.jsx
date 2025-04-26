@@ -15,6 +15,7 @@ export default function LearnFlow() {
   const [quiz, setQuiz] = useState(null);
   const [responses, setResponses] = useState([]);
   const [result, setResult] = useState(null);
+  const [showResult, setShowResult] = useState(false);
   const [loading, setLoading] = useState(false);
   const [isQuizLoading, setIsQuizLoading] = useState(false);
   const [error, setError] = useState('');
@@ -41,6 +42,10 @@ export default function LearnFlow() {
     }
   }, [state, learningPath]);
 
+  useEffect(() => {
+    console.log('State update:', { quiz: !!quiz, result: !!result, showResult, currentQuestionIndex, currentSubtopicIndex });
+  }, [quiz, result, showResult, currentQuestionIndex, currentSubtopicIndex]);
+
   const fetchLearningPath = async () => {
     setLoading(true);
     try {
@@ -49,7 +54,6 @@ export default function LearnFlow() {
         { headers: { 'x-access-token': token } }
       );
       setLearningPath(res.data.data);
-      setResponses(new Array(res.data.data.topics.length).fill(null));
       setError('');
     } catch (err) {
       const errorMessage = err.response?.data?.error || 'Failed to fetch learning path';
@@ -110,6 +114,8 @@ export default function LearnFlow() {
       setQuiz(res.data.data);
       setResponses(new Array(res.data.data.questions.length).fill(null));
       setResult(null);
+      setShowResult(false);
+      setCurrentQuestionIndex(0);
       setError('');
       toast.success('Quiz triggered successfully!');
     } catch (err) {
@@ -122,6 +128,12 @@ export default function LearnFlow() {
   };
 
   const submitQuiz = async () => {
+    if (!quiz || !responses || responses.length !== quiz.questions.length) {
+      const errorMessage = 'Invalid quiz or responses data';
+      setError(errorMessage);
+      notifyError(errorMessage);
+      return;
+    }
     setLoading(true);
     try {
       const res = await axios.post(
@@ -135,30 +147,42 @@ export default function LearnFlow() {
         },
         { headers: { 'x-access-token': token } }
       );
-      setResult(res.data.data);
-      setQuiz(null);
-      setResponses([]);
+      console.log('Submit quiz response:', JSON.stringify(res.data, null, 2));
+      if (!res.data.data.quiz) {
+        throw new Error('Quiz data missing in response');
+      }
+      setResult({ quiz: res.data.data.quiz });
+      setShowResult(true);
+      console.log('Result state set:', JSON.stringify({ quiz: res.data.data.quiz }, null, 2));
 
       const updatedPathRes = await axios.get(
         `http://localhost:3000/api/learning/learning-path/${learningPath._id}`,
         { headers: { 'x-access-token': token } }
       );
       const updatedPath = updatedPathRes.data.data;
-      setLearningPath(updatedPath);
 
-      const nextIndex = updatedPath.topics.findIndex(
-        (t, i) => i > currentSubtopicIndex && !t.completionStatus
-      );
-      if (nextIndex >= 0) {
-        setCurrentSubtopicIndex(nextIndex);
-      } else if (currentSubtopicIndex + 1 < updatedPath.topics.length) {
-        setCurrentSubtopicIndex(currentSubtopicIndex + 1);
+      if (updatedPath && Array.isArray(updatedPath.topics)) {
+        const nextIndex = updatedPath.topics.findIndex(
+          (t, i) => i > currentSubtopicIndex && !t.completionStatus
+        );
+        if (nextIndex >= 0) {
+          setCurrentSubtopicIndex(nextIndex);
+        } else if (currentSubtopicIndex + 1 < updatedPath.topics.length) {
+          setCurrentSubtopicIndex(currentSubtopicIndex + 1);
+        } else {
+          toast.info('Course completed or no more subtopics available!');
+        }
       } else {
-        toast.info('Course completed or no more subtopics available!');
+        setError('Failed to load updated learning path');
+        notifyError('Failed to load updated learning path');
       }
+
+      setQuiz(null);
+      setResponses([]);
+      setCurrentQuestionIndex(0);
       toast.success('Quiz submitted successfully!');
     } catch (err) {
-      const errorMessage = err.response?.data?.error || 'Failed to submit quiz';
+      const errorMessage = err.response?.data?.error || err.message || 'Failed to submit quiz';
       setError(errorMessage);
       notifyError(errorMessage);
     } finally {
@@ -179,10 +203,13 @@ export default function LearnFlow() {
   };
 
   const resetQuiz = () => {
+    console.log('Resetting quiz state');
     setQuiz(null);
     setResponses([]);
     setResult(null);
+    setShowResult(false);
     setCurrentQuestionIndex(0);
+    setShowQuestionSelector(false);
     setError('');
   };
 
@@ -226,7 +253,7 @@ export default function LearnFlow() {
       {learningPath ? (
         <div className="max-w-4xl mx-auto">
           <h2 className="text-2xl font-bold text-green-400 mb-6">{learningPath.courseName} Learning Path</h2>
-          {!quiz ? (
+          {!quiz && !showResult ? (
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -253,11 +280,6 @@ export default function LearnFlow() {
                     </li>
                   ))}
                 </ul>
-                <textarea
-                  placeholder="Paste text or YouTube URL to simplify"
-                  onBlur={(e) => e.target.value && simplifyContent(e.target.value, 'text')}
-                  className="w-full p-3 mt-4 bg-[#0d1f0d] border border-green-900/30 rounded-lg text-gray-300"
-                />
                 <motion.button
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
@@ -314,6 +336,8 @@ export default function LearnFlow() {
               setResponses={setResponses}
               result={result}
               setResult={setResult}
+              showResult={showResult}
+              setShowResult={setShowResult}
               loading={loading}
               setLoading={setLoading}
               error={error}

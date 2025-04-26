@@ -45,12 +45,21 @@ const Dashboard = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [courseName, setCourseName] = useState("");
   const [difficultyLevel, setDifficultyLevel] = useState("");
+  const [courseType, setCourseType] = useState(""); // New state for course type
+  const [cbseCourse, setCbseCourse] = useState(""); // New state for CBSE course
   const [isCreatingPath, setIsCreatingPath] = useState(false);
-    const [pastScores, setPastScores] = useState([]);
+  const [pastScores, setPastScores] = useState([]);
   const navigate = useNavigate();
 
-  // Mock past quiz scores if not provided by backend
-
+  // Mock CBSE courses (replace with actual data if fetched from backend)
+  const cbseCourses = [
+    { id: "class-9-cbse", name: "Class 9th CBSE" },
+    { id: "class-10-cbse", name: "Class 10th CBSE" },
+    { id: "class-11-pcb", name: "Class 11th CBSE (PCB)" },
+    { id: "class-11-pcm", name: "Class 11th CBSE (PCM)" },
+    { id: "class-12-pcb", name: "Class 12th CBSE (PCB)" },
+    { id: "class-12-pcm", name: "Class 12th CBSE (PCM)" },
+  ];
 
   // Fetch user profile and dashboard data
   useEffect(() => {
@@ -85,28 +94,27 @@ const Dashboard = () => {
             headers: { "x-access-token": token },
           }
         );
-          const dashboardResult = await dashboardResponse.json();
+        const dashboardResult = await dashboardResponse.json();
 
         if (dashboardResult.status === "ok") {
           setDashboardData(dashboardResult.data);
         } else {
           throw new Error(dashboardResult.error || "Failed to fetch dashboard data");
         }
-          
-          const pastScoresResponse = await fetch(
-              "http://localhost:3000/api/past-score",
-              {
-                  headers: { "x-access-token": token },
-              }
-          );
-          const scores = await pastScoresResponse.json();
 
+        const pastScoresResponse = await fetch(
+          "http://localhost:3000/api/past-score",
+          {
+            headers: { "x-access-token": token },
+          }
+        );
+        const scores = await pastScoresResponse.json();
 
-          if (scores.status === "ok") { 
-              setPastScores(scores.data.pastScores);
-          } else {
-              throw new Error(scores.error || "Failed to fetch past scores");
-            }
+        if (scores.status === "ok") {
+          setPastScores(scores.data.pastScores);
+        } else {
+          throw new Error(scores.error || "Failed to fetch past scores");
+        }
 
         setLoading(false);
       } catch (error) {
@@ -175,27 +183,52 @@ const Dashboard = () => {
 
   // Handle adding a new learning path
   const handleAddLearningPath = async () => {
-    if (!courseName || !difficultyLevel || !["Easy", "Medium", "Hard"].includes(difficultyLevel)) {
-      toast.error("Please provide a valid course name and difficulty level (Easy/Medium/Hard).");
-      return;
-    }
-
-    setIsCreatingPath(true);
     const token = localStorage.getItem("token");
+    setIsCreatingPath(true);
 
     try {
-      const response = await fetch("http://localhost:3000/api/learning/generate-learning-path", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-access-token": token,
-        },
-        body: JSON.stringify({ courseName, difficultyLevel }),
-      });
+      let response;
+      if (courseType === "cbse") {
+        // Validate CBSE course
+        if (!cbseCourse) {
+          toast.error("Please select a CBSE course.");
+          return;
+        }
+
+        // Call CBSE course API
+        response = await fetch("http://localhost:3000/api/generate-cbse-course", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-access-token": token,
+          },
+          body: JSON.stringify({ courseId: cbseCourse }),
+        });
+      } else {
+        // Validate custom course
+        if (!courseName || !difficultyLevel || !["Easy", "Medium", "Hard"].includes(difficultyLevel)) {
+          toast.error("Please provide a valid course name and difficulty level (Easy/Medium/Hard).");
+          return;
+        }
+
+        // Call custom course API
+        response = await fetch("http://localhost:3000/api/learning/generate-learning-path", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-access-token": token,
+          },
+          body: JSON.stringify({ courseName, difficultyLevel }),
+        });
+      }
 
       const result = await response.json();
       if (result.status === "ok") {
-        toast.success(`Learning path "${courseName}" created successfully!`);
+        toast.success(
+          courseType === "cbse"
+            ? `CBSE course "${cbseCourses.find((c) => c.id === cbseCourse)?.name}" learning paths created successfully!`
+            : `Learning path "${courseName}" created successfully!`
+        );
         // Refresh dashboard data
         const dashboardResponse = await fetch(
           "http://localhost:3000/api/learning/dashboard",
@@ -210,6 +243,8 @@ const Dashboard = () => {
         setIsModalOpen(false);
         setCourseName("");
         setDifficultyLevel("");
+        setCourseType("");
+        setCbseCourse("");
       } else {
         throw new Error(result.error || "Failed to create learning path");
       }
@@ -494,28 +529,60 @@ const Dashboard = () => {
             </div>
             <div className="space-y-4">
               <div>
-                <label className="block text-gray-400 mb-1">Course Name</label>
-                <input
-                  type="text"
-                  value={courseName}
-                  onChange={(e) => setCourseName(e.target.value)}
-                  className="w-full p-2 bg-[#0a1a0a] border border-green-900/50 rounded-lg text-white focus:outline-none focus:border-green-500"
-                  placeholder="Enter course name"
-                />
-              </div>
-              <div>
-                <label className="block text-gray-400 mb-1">Difficulty Level</label>
+                <label className="block text-gray-400 mb-1">Course Type</label>
                 <select
-                  value={difficultyLevel}
-                  onChange={(e) => setDifficultyLevel(e.target.value)}
+                  value={courseType}
+                  onChange={(e) => setCourseType(e.target.value)}
                   className="w-full p-2 bg-[#0a1a0a] border border-green-900/50 rounded-lg text-white focus:outline-none focus:border-green-500"
                 >
-                  <option value="">Select difficulty</option>
-                  <option value="Easy">Easy</option>
-                  <option value="Medium">Medium</option>
-                  <option value="Hard">Hard</option>
+                  <option value="">Select course type</option>
+                  <option value="custom">Custom Course</option>
+                  <option value="cbse">Predefined Course (CBSE)</option>
                 </select>
               </div>
+              {courseType === "cbse" ? (
+                <div>
+                  <label className="block text-gray-400 mb-1">Select CBSE Course</label>
+                  <select
+                    value={cbseCourse}
+                    onChange={(e) => setCbseCourse(e.target.value)}
+                    className="w-full p-2 bg-[#0a1a0a] border border-green-900/50 rounded-lg text-white focus:outline-none focus:border-green-500"
+                  >
+                    <option value="">Select CBSE course</option>
+                    {cbseCourses.map((course) => (
+                      <option key={course.id} value={course.id}>
+                        {course.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              ) : courseType === "custom" ? (
+                <>
+                  <div>
+                    <label className="block text-gray-400 mb-1">Course Name</label>
+                    <input
+                      type="text"
+                      value={courseName}
+                      onChange={(e) => setCourseName(e.target.value)}
+                      className="w-full p-2 bg-[#0a1a0a] border border-green-900/50 rounded-lg text-white focus:outline-none focus:border-green-500"
+                      placeholder="Enter course name"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-gray-400 mb-1">Difficulty Level</label>
+                    <select
+                      value={difficultyLevel}
+                      onChange={(e) => setDifficultyLevel(e.target.value)}
+                      className="w-full p-2 bg-[#0a1a0a] border border-green-900/50 rounded-lg text-white focus:outline-none focus:border-green-500"
+                    >
+                      <option value="">Select difficulty</option>
+                      <option value="Easy">Easy</option>
+                      <option value="Medium">Medium</option>
+                      <option value="Hard">Hard</option>
+                    </select>
+                  </div>
+                </>
+              ) : null}
               <motion.button
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}

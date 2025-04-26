@@ -10,6 +10,7 @@ const socialAuthRoutes = require("./routes/socialAuthRoute");
 const learningRoutes = require("./Routes/learningRoutes");
 const quizRoutes = require("./Routes/quizRoutes");
 const analyticsRoutes = require("./Routes/analyticsRoutes");
+const cbseCourseRoutes = require("./Routes/cbseCourseRoutes");
 const passport = require("./utils/passportConfig");
 const session = require("express-session");
 const path = require("path");
@@ -42,6 +43,7 @@ app.use("/auth", socialAuthRoutes);
 app.use("/api/learning", learningRoutes);
 app.use("/api/quiz", quizRoutes);
 app.use("/api", analyticsRoutes);
+app.use("/api", cbseCourseRoutes);
 
 app.listen(3000, () => {
   console.log("Server started on 3000");

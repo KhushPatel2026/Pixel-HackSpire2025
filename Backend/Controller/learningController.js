@@ -246,12 +246,26 @@ class LearningController {
                 return res.status(404).json({ status: 'error', error: 'Quiz not found or unauthorized' });
             }
 
+            if (responses.length !== quiz.questions.length) {
+                return res.status(400).json({
+                    status: 'error',
+                    error: `Invalid number of responses: expected ${quiz.questions.length}, got ${responses.length}`
+                });
+            }
+
             let totalMarks = 0;
             const totalPossibleMarks = quiz.questions.reduce((sum, q) => sum + q.marks, 0);
             const processedResponses = responses.map((response, index) => {
                 const question = quiz.questions[index];
                 if (!question) {
-                    throw new Error(`Invalid question index: ${index}`);
+                    return {
+                        question: `Unknown question at index ${index}`,
+                        selectedOption: response.selectedOption,
+                        isCorrect: false,
+                        marksObtained: 0,
+                        responseTime: response.responseTime,
+                        feedback: 'Invalid question index'
+                    };
                 }
                 const isCorrect = response.selectedOption === question.correctAnswer;
                 const marksObtained = isCorrect ? question.marks : 0;
@@ -263,8 +277,7 @@ class LearningController {
                     isCorrect,
                     marksObtained,
                     responseTime: response.responseTime,
-                    feedback: isCorrect ? 'Correct!' : `Incorrect. ${question.aiGeneratedExplanation || 'Please review the topic.'}`,
-                    resources: []
+                    feedback: isCorrect ? 'Correct!' : `Incorrect. ${question.aiGeneratedExplanation || 'Please review the topic.'}`
                 };
             });
 
@@ -281,20 +294,9 @@ class LearningController {
                 'learning-path'
             );
 
-            // Attach resources to incorrect responses
-            quiz.responses = quiz.responses.map((response, index) => {
-                if (!response.isCorrect) {
-                    const feedback = performanceAnalysis.incorrectFeedback.find(f => f.question === response.question);
-                    if (feedback) {
-                        response.feedback = feedback.feedback;
-                        response.resources = feedback.resources;
-                    }
-                }
-                return response;
-            });
-
             quiz.strengths = performanceAnalysis.strengths;
             quiz.weaknesses = performanceAnalysis.weaknesses;
+            quiz.resources = performanceAnalysis.resources;
 
             await quiz.save();
 
@@ -308,11 +310,10 @@ class LearningController {
                     }
                 );
 
-                // Update learning path with remedial subtopics only for incorrect answers
                 const incorrectSubtopics = [...new Set(
                     quiz.responses
                         .filter(r => !r.isCorrect)
-                        .map((_, i) => quiz.questions[i].subtopic)
+                        .map((_, i) => quiz.questions[i]?.subtopic || 'Unknown')
                 )];
                 const remedialSubtopics = performanceAnalysis.remedialSubtopics
                     .filter(st => incorrectSubtopics.includes(st.name));

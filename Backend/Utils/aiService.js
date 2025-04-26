@@ -4,7 +4,6 @@ const fs = require('fs');
 const path = require('path');
 const ffmpeg = require('fluent-ffmpeg');
 const { PassThrough } = require('stream');
-const fetch = require('node-fetch'); // Added for URL validation
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 const deepgram = createClient(process.env.DEEPGRAM_API_KEY);
@@ -26,12 +25,64 @@ const parseJsonSafely = (text, fallback, errorMessage) => {
     }
 };
 
-const isValidUrl = async (url) => {
+const generateResources = async (topicName, subtopic, numResources = 3) => {
     try {
-        const response = await fetch(url, { method: 'HEAD', timeout: 5000 });
-        return response.ok && (url.startsWith('https://') || url.startsWith('http://'));
-    } catch {
-        return false;
+        const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+        const prompt = `
+Generate a list of ${numResources} high-quality, reliable online resources for learning the core concepts of "${subtopic}" within the topic "${topicName}". Focus strictly on the core concepts, avoiding loosely related or tangential topics. Prefer resources from reputable sources like educational institutions (*.edu), non-profits (*.org), government sites (*.gov), or well-known platforms (e.g., Khan Academy, Coursera, freeCodeCamp, YouTube). Each resource should include:
+- title: A descriptive title
+- url: A valid URL (use placeholder URLs like https://www.example.com if unsure, but prefer real URLs)
+Return a JSON array of resources:
+[
+  {
+    "title": "Resource Title",
+    "url": "https://www.example.com"
+  }
+]`;
+        const result = await model.generateContent(prompt);
+        const response = await result.response;
+        const rawText = response.text();
+
+        const cleanedText = cleanJsonResponse(rawText);
+        const fallback = [
+            {
+                title: `Introduction to ${subtopic}`,
+                url: `https://www.khanacademy.org/learn/${topicName.toLowerCase()}`
+            },
+            {
+                title: `${subtopic} Tutorial`,
+                url: `https://www.coursera.org/learn/${topicName.toLowerCase()}`
+            },
+            {
+                title: `${subtopic} Guide`,
+                url: `https://www.freecodecamp.org/learn/${topicName.toLowerCase()}`
+            }
+        ].slice(0, numResources);
+        const parsed = parseJsonSafely(cleanedText, fallback, 'Failed to parse resource JSON');
+
+        if (!Array.isArray(parsed) || parsed.length === 0) {
+            return fallback;
+        }
+
+        return parsed
+            .filter(resource => resource.title && resource.url)
+            .slice(0, numResources);
+    } catch (error) {
+        console.error('generateResources error:', error.message);
+        return [
+            {
+                title: `Introduction to ${subtopic}`,
+                url: `https://www.khanacademy.org/learn/${topicName.toLowerCase()}`
+            },
+            {
+                title: `${subtopic} Tutorial`,
+                url: `https://www.coursera.org/learn/${topicName.toLowerCase()}`
+            },
+            {
+                title: `${subtopic} Guide`,
+                url: `https://www.freecodecamp.org/learn/${topicName.toLowerCase()}`
+            }
+        ].slice(0, numResources);
     }
 };
 
@@ -119,16 +170,14 @@ const generateAdaptivePath = async (userId, courseName, difficultyLevel, prefere
 Generate a personalized learning path for user ${userId} for the topic "${courseName}" at ${difficultyLevel} difficulty. Focus strictly on the core concepts of "${courseName}", avoiding loosely related or tangential topics. Break it into 6-8 subtopics, each designed to teach the user from 0 to 100 in that subtopic. For each subtopic, provide:
 - name: Subtopic name
 - description: Brief description (1-2 sentences) of the core subtopic
-- resourceLinks: Array of 2-3 highly relevant, existent resources (e.g., YouTube videos, official documentation) with title and URL, strictly related to the subtopic and verified to exist
-Consider preferences: ${JSON.stringify(preferences)}. Ensure all resource URLs are valid, accessible, and directly address the subtopic. Return a JSON object with topics, strength, weakness, and duration (in hours). Example:
+- resourceLinks: Placeholder for resources (to be fetched separately)
+Consider preferences: ${JSON.stringify(preferences)}. Return a JSON object with topics, strength, weakness, and duration (in hours). Example:
 {
   "topics": [
     {
       "name": "Subtopic Name",
       "description": "Description",
-      "resourceLinks": [
-        { "title": "Resource Title", "url": "https://example.com" }
-      ]
+      "resourceLinks": []
     }
   ],
   "strength": "Strength description",
@@ -158,27 +207,8 @@ Consider preferences: ${JSON.stringify(preferences)}. Ensure all resource URLs a
             return fallback;
         }
 
-        // Add order and validate resources
-        const fallbackResources = {
-            'JavaScript': [
-                { title: 'MDN JavaScript Guide', url: 'https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide' },
-                { title: 'freeCodeCamp JavaScript', url: 'https://www.youtube.com/watch?v=PkZNo7MFNFg' }
-            ],
-            'Mathematics': [
-                { title: 'Khan Academy Algebra', url: 'https://www.khanacademy.org/math/algebra' },
-                { title: '3Blue1Brown Linear Algebra', url: 'https://www.youtube.com/playlist?list=PLZHQObOWTQDPD3MizzM2xVFitgF8hE_ab' }
-            ]
-        };
-
         parsed.topics = await Promise.all(parsed.topics.map(async (topic, index) => {
-            let resourceLinks = Array.isArray(topic.resourceLinks)
-                ? await Promise.all(topic.resourceLinks.map(async (r) => (await isValidUrl(r.url) ? r : null)).filter(Boolean))
-                : [];
-            
-            if (resourceLinks.length < 2 && fallbackResources[courseName]) {
-                resourceLinks = fallbackResources[courseName].slice(0, 3 - resourceLinks.length);
-            }
-
+            const resourceLinks = await generateResources(courseName, topic.name, 3);
             return {
                 name: topic.name || `Subtopic ${index + 1}`,
                 description: topic.description || `Learn core aspects of ${topic.name || 'this topic'}.`,
@@ -195,7 +225,7 @@ Consider preferences: ${JSON.stringify(preferences)}. Ensure all resource URLs a
                 {
                     name: `${courseName} Basics`,
                     description: `Introduction to core concepts of ${courseName}.`,
-                    resourceLinks: [],
+                    resourceLinks: await generateResources(courseName, `${courseName} Basics`, 3),
                     order: 1
                 }
             ],
@@ -318,6 +348,10 @@ const analyzeQuizPerformance = async (topicName, difficultyLevel, responses, que
             }
         });
 
+        const weakSubtopics = Object.keys(subtopicPerformance).filter(
+            subtopic => subtopicPerformance[subtopic].correct / subtopicPerformance[subtopic].total < 0.7
+        );
+
         const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
         const prompt = `
 Analyze the quiz performance for a ${quizType} quiz on the topic "${topicName}" at ${difficultyLevel} difficulty. Focus strictly on the core concepts of "${topicName}", avoiding loosely related or tangential topics. Below are the responses, questions, and performance metrics:
@@ -333,22 +367,18 @@ Performance Metrics:
 Generate:
 - strengths: Highlight strong subtopics (e.g., high accuracy) within the core topic.
 - weaknesses: Identify weak subtopics (e.g., low accuracy) within the core topic.
-- resources: Provide 2-4 highly relevant, existent resources (e.g., YouTube videos, official documentation) with title and URL, strictly tailored to the weak subtopics and verified to exist.
-- remedialSubtopics: If score < 70%, suggest 2-3 remedial subtopics within the core topic, each with name, description, and 1-2 highly relevant, existent resources.
+- resources: Placeholder for resources (to be fetched separately).
+- remedialSubtopics: If score < 70%, suggest 2-3 remedial subtopics within the core topic, each with name, description, and placeholder for resources.
 Return a JSON object:
 {
   "strengths": "Strength description",
   "weaknesses": "Weakness description",
-  "resources": [
-    { "title": "Resource Title", "url": "https://example.com" }
-  ],
+  "resources": [],
   "remedialSubtopics": [
     {
       "name": "Subtopic Name",
       "description": "Description",
-      "resourceLinks": [
-        { "title": "Resource Title", "url": "https://example.com" }
-      ]
+      "resourceLinks": []
     }
   ]
 }`;
@@ -386,48 +416,25 @@ Return a JSON object:
             return fallback;
         }
 
-        parsed.resources = await Promise.all(
-            parsed.resources
-                .filter(r => r.title && r.url)
-                .map(async (r) => (await isValidUrl(r.url) ? r : null))
-                .filter(Boolean)
-        ).then(res => res.slice(0, 4));
+        let resources = [];
+        for (const subtopic of weakSubtopics) {
+            const subtopicResources = await generateResources(topicName, subtopic, 2);
+            resources = [...resources, ...subtopicResources];
+        }
+        parsed.resources = resources.slice(0, 4);
 
         parsed.remedialSubtopics = await Promise.all(
             parsed.remedialSubtopics
-                .filter(st => st.name && st.description && Array.isArray(st.resourceLinks))
-                .map(async (st) => ({
-                    name: st.name,
-                    description: st.description,
-                    resourceLinks: await Promise.all(
-                        st.resourceLinks
-                            .filter(r => r.title && r.url)
-                            .map(async (r) => (await isValidUrl(r.url) ? r : null))
-                            .filter(Boolean)
-                    ).then(res => res.slice(0, 2))
-                }))
+                .filter(st => st.name && st.description)
+                .map(async (st) => {
+                    const subtopicResources = await generateResources(topicName, st.name, 2);
+                    return {
+                        name: st.name,
+                        description: st.description,
+                        resourceLinks: subtopicResources.slice(0, 2)
+                    };
+                })
         );
-
-        // Add fallback resources if none provided
-        const fallbackResources = {
-            'JavaScript': [
-                { title: 'MDN JavaScript Guide', url: 'https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide' },
-                { title: 'freeCodeCamp JavaScript', url: 'https://www.youtube.com/watch?v=PkZNo7MFNFg' }
-            ],
-            'Mathematics': [
-                { title: 'Khan Academy Algebra', url: 'https://www.khanacademy.org/math/algebra' },
-                { title: '3Blue1Brown Linear Algebra', url: 'https://www.youtube.com/playlist?list=PLZHQObOWTQDPD3MizzM2xVFitgF8hE_ab' }
-            ]
-        };
-        if (parsed.resources.length === 0 && fallbackResources[topicName]) {
-            parsed.resources = fallbackResources[topicName].slice(0, 4);
-        }
-        parsed.remedialSubtopics = parsed.remedialSubtopics.map(st => {
-            if (st.resourceLinks.length === 0 && fallbackResources[topicName]) {
-                st.resourceLinks = fallbackResources[topicName].slice(0, 2);
-            }
-            return st;
-        });
 
         return parsed;
     } catch (error) {
