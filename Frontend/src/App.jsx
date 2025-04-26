@@ -25,7 +25,7 @@ function App() {
     const tokenFromStorage = localStorage.getItem('token');
 
     // List of public routes that don't require a token
-    const publicRoutes = ['/', '/login'];
+    const publicRoutes = ['/', '/login','/recognition'];
 
     if (tokenFromUrl) {
       // If token is provided in URL, store it and redirect to profile
