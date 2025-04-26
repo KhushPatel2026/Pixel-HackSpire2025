@@ -42,8 +42,8 @@ export default function QuizPage() {
                   <Award className="h-8 w-8 text-green-400" />
                 </div>
               </div>
-              <h2 className="text-xl font-semibold text-green-300 text-center mb-2">Daily Quiz</h2>
-              <p className="text-gray-400 text-sm text-center">Join the daily challenge and compete on the leaderboard.</p>
+              <h2 className="text-xl font-semibold text-green-300 text-center mb-2">Fun Challenges</h2>
+              <p className="text-gray-400 text-sm text-center">Join the daily fun challenge and compete on the leaderboard.</p>
             </motion.button>
 
             <motion.button
