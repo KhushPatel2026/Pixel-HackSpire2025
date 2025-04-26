@@ -6,7 +6,8 @@ export default function DocumentChat() {
   const [file, setFile] = useState(null);
   const [question, setQuestion] = useState('');
   const [response, setResponse] = useState(null);
-  const [sources, setSources] = useState([]);
+  const [summary, setSummary] = useState(null);
+  const [chatHistory, setChatHistory] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [uploadStatus, setUploadStatus] = useState(null);
@@ -39,7 +40,8 @@ export default function DocumentChat() {
       setLoading(true);
       setError(null);
       setUploadStatus(null);
-      setResponse(null); // Clear any previous response
+      setSummary(null);
+      setChatHistory([]);
 
       const res = await axios.post(`${API_BASE_URL}/upload`, formData, {
         headers: {
@@ -47,9 +49,8 @@ export default function DocumentChat() {
         },
       });
 
-      // Set the upload status and display the summary
-      setUploadStatus(`File processed successfully! ${res.data.page_count} pages processed.`);
-      setResponse(res.data.summary); // Display the summary immediately after upload
+      setUploadStatus(`File processed successfully! ${res.data.page_count} pages processed into ${res.data.chunk_count} chunks.`);
+      setSummary(res.data.summary);
     } catch (err) {
       console.error('Upload Error:', err);
       setError(err.response?.data?.error || 'Failed to upload file. Please try again.');
@@ -58,7 +59,7 @@ export default function DocumentChat() {
     }
   };
 
-  // Handle chat question submission to /chat endpoint
+  // Handle chat question submission
   const handleChatSubmit = async () => {
     if (!question.trim()) {
       setError('Please enter a question.');
@@ -68,19 +69,17 @@ export default function DocumentChat() {
     try {
       setLoading(true);
       setError(null);
-      setResponse(null);
-      setSources([]);
 
       const res = await axios.post(`${API_BASE_URL}/chat`, {
         question: question.trim(),
-      }, {
-        headers: {
-          'Content-Type': 'application/json',
-        },
       });
 
-      setResponse(res.data.answer);
-      setSources(res.data.sources);
+      // Add the Q&A to chat history
+      setChatHistory(prev => [...prev, {
+        question: question.trim(),
+        answer: res.data.answer
+      }]);
+
       setQuestion(''); // Clear the input after successful submission
     } catch (err) {
       console.error('Chat Error:', err);
@@ -178,37 +177,58 @@ export default function DocumentChat() {
           )}
         </div>
 
-        {/* Chat Section */}
-        <div className="space-y-6 bg-[#0a1a0a]/80 backdrop-blur-sm p-6 rounded-2xl border border-green-500/20">
-          <h2 className="text-xl font-semibold bg-clip-text text-transparent bg-gradient-to-r from-green-400 to-emerald-400">
-            Ask a Question
-          </h2>
-          <textarea
-            className="w-full border-none p-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-600 bg-[#0d1f0d] text-white placeholder-gray-400"
-            placeholder="Enter your question about the document..."
-            value={question}
-            onChange={(e) => setQuestion(e.target.value)}
-            disabled={loading}
-            rows="4"
-          />
-          <button
-            onClick={handleChatSubmit}
-            disabled={loading}
-            className={`w-full bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 text-white py-3 px-6 rounded-xl transition-all duration-300 hover:shadow-[0_0_15px_rgba(16,185,129,0.5)] transform hover:scale-105 ${
-              loading ? 'opacity-50 cursor-not-allowed' : ''
-            }`}
-          >
-            {loading ? 'Processing...' : 'Ask Question'}
-          </button>
-        </div>
-
-        {/* Chat Response Section */}
-        {response && (
+        {/* Document Summary Section */}
+        {summary && (
           <div className="mt-6 p-6 bg-[#0a1a0a]/80 backdrop-blur-sm rounded-2xl border border-green-500/20">
             <h2 className="text-xl font-bold mb-2 bg-clip-text text-transparent bg-gradient-to-r from-green-400 to-emerald-400">
               Document Summary
             </h2>
-            <p className="text-gray-300 mb-4 whitespace-pre-line">{response}</p>
+            <p className="text-gray-300 mb-4 whitespace-pre-line">{summary}</p>
+          </div>
+        )}
+
+        {/* Chat Section */}
+        {summary && (
+          <div className="space-y-6 bg-[#0a1a0a]/80 backdrop-blur-sm p-6 rounded-2xl border border-green-500/20 mt-6">
+            <h2 className="text-xl font-semibold bg-clip-text text-transparent bg-gradient-to-r from-green-400 to-emerald-400">
+              Ask Questions About Your Document
+            </h2>
+            <div className="space-y-4">
+              {/* Chat History */}
+              {chatHistory.map((chat, index) => (
+                <div key={index} className="space-y-2">
+                  <div className="bg-green-900/30 p-3 rounded-xl">
+                    <p className="font-semibold text-green-400">Question:</p>
+                    <p className="text-gray-200">{chat.question}</p>
+                  </div>
+                  <div className="bg-[#0d1f0d] p-3 rounded-xl">
+                    <p className="font-semibold text-emerald-400">Answer:</p>
+                    <p className="text-gray-300 whitespace-pre-line">{chat.answer}</p>
+                  </div>
+                </div>
+              ))}
+
+              {/* Question Input */}
+              <div className="space-y-4">
+                <textarea
+                  className="w-full border-none p-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-600 bg-[#0d1f0d] text-white placeholder-gray-400"
+                  placeholder="Ask a question about your document..."
+                  value={question}
+                  onChange={(e) => setQuestion(e.target.value)}
+                  disabled={loading}
+                  rows="3"
+                />
+                <button
+                  onClick={handleChatSubmit}
+                  disabled={loading || !question.trim()}
+                  className={`w-full bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 text-white py-3 px-6 rounded-xl transition-all duration-300 hover:shadow-[0_0_15px_rgba(16,185,129,0.5)] transform hover:scale-105 ${
+                    loading || !question.trim() ? 'opacity-50 cursor-not-allowed' : ''
+                  }`}
+                >
+                  {loading ? 'Processing...' : 'Ask Question'}
+                </button>
+              </div>
+            </div>
           </div>
         )}
       </main>

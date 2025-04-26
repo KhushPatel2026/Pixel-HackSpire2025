@@ -6,6 +6,10 @@ from dotenv import load_dotenv
 from pypdf import PdfReader
 import google.generativeai as genai
 import json
+import numpy as np
+from pinecone import Pinecone, ServerlessSpec
+from langchain.text_splitter import RecursiveCharacterTextSplitter
+import time
 
 app = Flask(__name__)
 CORS(app)
@@ -15,11 +19,18 @@ print("Starting Flask application...")
 # Load environment variables before anything else
 load_dotenv()
 
-# Configure API key and check if it exists
+# Configure API keys and check if they exist
 GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
+PINECONE_API_KEY = os.getenv('PINECONE_API_KEY')
+PINECONE_ENV = os.getenv('PINECONE_ENV')
+PINECONE_INDEX_NAME = os.getenv('PINECONE_INDEX_NAME', 'pdf-embeddings')
 
 if not GEMINI_API_KEY:
     raise ValueError("GEMINI_API_KEY not found in environment variables")
+if not PINECONE_API_KEY:
+    raise ValueError("PINECONE_API_KEY not found in environment variables")
+if not PINECONE_ENV:
+    raise ValueError("PINECONE_ENV not found in environment variables")
 
 # Initialize Gemini
 print("Configuring Gemini API...")
@@ -33,7 +44,77 @@ generation_config = {
     'max_output_tokens': 2048,
 }
 model = genai.GenerativeModel('gemini-2.0-flash', generation_config=generation_config)
-print("Gemini model configured with generation parameters")
+
+# Initialize embedding model
+print("Configuring embedding model...")
+embedding_model = genai.GenerativeModel('embedding-001')
+
+def get_embedding(text):
+    """Get embedding for a text using Gemini directly"""
+    try:
+        response = genai.embed_content(
+            model='models/embedding-001',
+            content=text,
+            task_type='retrieval_query'
+        )
+        return response['embedding']
+    except Exception as e:
+        print(f"Error generating embedding: {str(e)}")
+        raise
+
+def batch_get_embeddings(texts, batch_size=20):
+    """Get embeddings for multiple texts in batches"""
+    all_embeddings = []
+    for i in range(0, len(texts), batch_size):
+        batch = texts[i:i + batch_size]
+        batch_embeddings = []
+        for text in batch:
+            try:
+                response = genai.embed_content(
+                    model='models/embedding-001',
+                    content=text,
+                    task_type='retrieval_document'
+                )
+                batch_embeddings.append(response['embedding'])
+            except Exception as e:
+                print(f"Error in batch embedding: {str(e)}")
+                raise
+        all_embeddings.extend(batch_embeddings)
+        print(f"Processed batch {i//batch_size + 1} of {(len(texts) + batch_size - 1)//batch_size}")
+    return all_embeddings
+
+# Initialize Pinecone with new client
+print("Initializing Pinecone...")
+pc = Pinecone(api_key=PINECONE_API_KEY)
+
+# Create or get the index
+DIMENSION = 768  # dimension for embedding model
+
+# Check if index already exists, if not create it
+if PINECONE_INDEX_NAME not in pc.list_indexes().names():
+    print(f"Creating new Pinecone index: {PINECONE_INDEX_NAME}")
+    pc.create_index(
+        name=PINECONE_INDEX_NAME,
+        dimension=DIMENSION,
+        metric='cosine',
+        spec=ServerlessSpec(
+            cloud='aws',
+            region='us-west-2'
+        )
+    )
+    # Wait for index to be ready
+    time.sleep(10)
+
+# Connect to the index
+index = pc.Index(PINECONE_INDEX_NAME)
+print("Pinecone index ready")
+
+# Initialize text splitter
+text_splitter = RecursiveCharacterTextSplitter(
+    chunk_size=1000,
+    chunk_overlap=200,
+    length_function=len,
+)
 
 UPLOAD_FOLDER = 'uploads'
 if not os.path.exists(UPLOAD_FOLDER):
@@ -43,8 +124,9 @@ app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
 
 def process_pdf(file_path):
-    """Process PDF and get summary from Gemini"""
+    """Process PDF and create vector store in Pinecone"""
     print(f"Starting to process PDF: {file_path}")
+    
     # Read PDF
     pdf_reader = PdfReader(file_path)
     text = ""
@@ -54,41 +136,111 @@ def process_pdf(file_path):
     print(f"PDF text extracted successfully. Total pages: {len(pdf_reader.pages)}")
     print(f"Extracted text length: {len(text)} characters")
     
-    # Prepare the prompt for summarization
-    prompt = f"""Please provide a comprehensive summary of the following document. Include:
+    # Split text into chunks
+    chunks = text_splitter.split_text(text)
+    print(f"Split into {len(chunks)} chunks")
+    
+    # Create embeddings in batches
+    print("Generating embeddings...")
+    chunk_embeddings = batch_get_embeddings(chunks)
+    print(f"Generated embeddings for {len(chunk_embeddings)} chunks")
+    
+    # Prepare vectors for Pinecone
+    vectors = []
+    for i, (chunk, embedding) in enumerate(zip(chunks, chunk_embeddings)):
+        vectors.append({
+            'id': f'chunk_{i}',
+            'values': embedding,
+            'metadata': {
+                'text': chunk,
+                'page': i // len(pdf_reader.pages)
+            }
+        })
+    
+    # Clear existing vectors (if any) and upsert new ones
+    print("Clearing existing vectors...")
+    index.delete(delete_all=True)
+    
+    # Upsert in batches of 100
+    batch_size = 100
+    for i in range(0, len(vectors), batch_size):
+        batch = vectors[i:i + batch_size]
+        index.upsert(vectors=batch)
+        print(f"Uploaded batch {i//batch_size + 1} of {(len(vectors) + batch_size - 1)//batch_size}")
+    
+    print("Vectors uploaded to Pinecone successfully")
+    
+    # Generate initial summary
+    summary_prompt = f"""Please provide a comprehensive summary of the following document. Include:
 1. Main topics and key points
 2. Important findings or conclusions
 3. Any significant data or statistics
 4. Key recommendations (if any)
 
 Document text:
-{text}
+{text[:5000]}  # Using first 5000 chars for summary
 
 Please structure the summary in a clear, organized manner."""
     
+    response = model.generate_content(summary_prompt)
+    
+    return {
+        'summary': response.text,
+        'page_count': len(pdf_reader.pages),
+        'chunk_count': len(chunks)
+    }
+
+def get_relevant_chunks(query, top_k=3):
+    """Retrieve most relevant chunks for a query from Pinecone"""
+    # Get query embedding
+    query_embedding = get_embedding(query)
+    
+    # Search in Pinecone
+    results = index.query(
+        vector=query_embedding,
+        top_k=top_k,
+        include_metadata=True
+    )
+    
+    # Extract chunks from results
+    chunks = [match.metadata['text'] for match in results.matches]
+    return chunks
+
+@app.route('/chat', methods=['POST'])
+def chat():
     try:
-        print("Sending request to Gemini API...")
-        # Get summary from Gemini
+        data = request.json
+        if not data or 'question' not in data:
+            return jsonify({'error': 'No question provided'}), 400
+        
+        question = data['question']
+        print(f"Received question: {question}")
+        
+        # Get relevant chunks
+        relevant_chunks = get_relevant_chunks(question)
+        context = "\n\n".join(relevant_chunks)
+        
+        # Prepare prompt
+        prompt = f"""Based on the following context, please answer the question. If the answer cannot be found in the context, say "I cannot find information about this in the document."
+
+Context:
+{context}
+
+Question: {question}
+
+Answer:"""
+        
+        # Generate response
         response = model.generate_content(prompt)
         
-        # Debug response object
-        print(f"Response received. Response type: {type(response)}")
+        return jsonify({
+            'answer': response.text,
+            'context': relevant_chunks  # Optional: return context for debugging
+        }), 200
         
-        if response.text:
-            print("Summary generated successfully")
-            print(f"Summary length: {len(response.text)} characters")
-            return {
-                'summary': response.text,
-                'page_count': len(pdf_reader.pages)
-            }
-        else:
-            print("Error: Empty response text from Gemini")
-            raise Exception("Empty response from Gemini")
-            
     except Exception as e:
-        print(f"Error during Gemini API call: {str(e)}")
-        print(f"Full error details: {repr(e)}")
-        raise Exception(f"Failed to generate summary: {str(e)}")
+        print(f"Error in chat endpoint: {str(e)}")
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/upload', methods=['POST'])
 def upload_file():
@@ -119,7 +271,8 @@ def upload_file():
             return jsonify({
                 'message': 'File processed successfully',
                 'summary': result['summary'],
-                'page_count': result['page_count']
+                'page_count': result['page_count'],
+                'chunk_count': result['chunk_count']
             }), 200
             
         except Exception as e:
