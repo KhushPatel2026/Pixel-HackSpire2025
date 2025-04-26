@@ -1,8 +1,6 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Award, Send, ChevronRight, ChevronLeft, List, CheckCircle, Circle, Link } from 'lucide-react';
-import { ToastContainer, toast } from 'react-toastify';
-import 'react-toastify/dist/ReactToastify.css';
 
 export default function QuizCore({
   quiz,
@@ -30,7 +28,7 @@ export default function QuizCore({
   };
 
   const goToQuestion = (index) => {
-    if (index >= 0 && index < quiz.questions.length) {
+    if (index >= 0 && index < (quiz?.questions?.length || 0)) {
       setCurrentQuestionIndex(index);
       setShowQuestionSelector(false);
     }
@@ -41,6 +39,7 @@ export default function QuizCore({
   };
 
   const renderQuestion = (question, index) => {
+    if (!question) return null;
     return (
       <motion.div 
         key={index}
@@ -78,6 +77,7 @@ export default function QuizCore({
   };
 
   const renderQuestionSelector = () => {
+    if (!quiz?.questions) return null;
     return (
       <motion.div
         initial={{ opacity: 0, y: -10 }}
@@ -126,7 +126,7 @@ export default function QuizCore({
           <div className="w-32 bg-[#0d1f0d]/50 rounded-full h-2 overflow-hidden">
             <div 
               className="bg-gradient-to-r from-green-600 to-emerald-500 h-full rounded-full" 
-              style={{ width: `${(answeredQuestions / totalQuestions) * 100}%` }}
+              style={{ width: totalQuestions > 0 ? `${(answeredQuestions / totalQuestions) * 100}%` : '0%' }}
             />
           </div>
         </div>
@@ -136,7 +136,10 @@ export default function QuizCore({
 
   let recommendedResources = [];
   try {
-    recommendedResources = result?.quiz?.reccommendedResources ? JSON.parse(result.quiz.reccommendedResources) : [];
+    // Fix typo: reccommendedResources -> recommendedResources
+    recommendedResources = result?.quiz?.recommendedResources
+      ? JSON.parse(result.quiz.recommendedResources)
+      : [];
   } catch (error) {
     console.error('Failed to parse recommended resources:', error);
   }
@@ -150,6 +153,12 @@ export default function QuizCore({
           className="mb-4 p-3 bg-red-900/30 border border-red-500/30 text-red-300 rounded-lg"
         >
           {error}
+          <button
+            onClick={() => setError('')}
+            className="ml-4 text-sm text-green-400 hover:underline"
+          >
+            Clear
+          </button>
         </motion.div>
       )}
 
@@ -164,13 +173,14 @@ export default function QuizCore({
           
           <div className="relative min-h-64">
             <AnimatePresence mode="wait">
-              {renderQuestion(quiz.questions[currentQuestionIndex], currentQuestionIndex)}
+              {quiz.questions && renderQuestion(quiz.questions[currentQuestionIndex], currentQuestionIndex)}
             </AnimatePresence>
             
             <div className="absolute top-0 right-0">
               <button 
                 onClick={toggleQuestionSelector}
                 className="p-2 rounded-lg bg-[#0d1f0d]/50 hover:bg-[#0d1f0d] transition-colors border border-green-900/30"
+                disabled={loading}
               >
                 <List className="h-5 w-5 text-green-400" />
               </button>
@@ -186,9 +196,9 @@ export default function QuizCore({
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
               onClick={goToPrevQuestion}
-              disabled={currentQuestionIndex === 0}
+              disabled={currentQuestionIndex === 0 || loading}
               className={`px-4 py-2 rounded-lg flex items-center gap-1 border border-green-900/30 ${
-                currentQuestionIndex === 0 
+                currentQuestionIndex === 0 || loading
                   ? 'opacity-50 cursor-not-allowed bg-[#0d1f0d]/20' 
                   : 'bg-[#0d1f0d]/50 hover:bg-[#0d1f0d]/80'
               }`}
@@ -197,7 +207,7 @@ export default function QuizCore({
               Previous
             </motion.button>
             
-            {currentQuestionIndex === quiz.questions.length - 1 ? (
+            {currentQuestionIndex === (quiz?.questions?.length - 1 || 0) ? (
               <motion.button
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
@@ -207,7 +217,14 @@ export default function QuizCore({
                   loading ? 'opacity-50 cursor-not-allowed' : ''
                 }`}
               >
-                <Send className="h-5 w-5" />
+                {loading ? (
+                  <svg className="animate-spin h-5 w-5 mr-2 text-white" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                  </svg>
+                ) : (
+                  <Send className="h-5 w-5" />
+                )}
                 {loading ? 'Submitting...' : 'Submit Quiz'}
               </motion.button>
             ) : (
@@ -215,7 +232,10 @@ export default function QuizCore({
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
                 onClick={goToNextQuestion}
-                className="px-4 py-2 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 rounded-lg font-medium flex items-center gap-1"
+                disabled={loading}
+                className={`px-4 py-2 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 rounded-lg font-medium flex items-center gap-1 ${
+                  loading ? 'opacity-50 cursor-not-allowed' : ''
+                }`}
               >
                 Next
                 <ChevronRight className="h-5 w-5" />
@@ -326,25 +346,13 @@ export default function QuizCore({
             whileTap={{ scale: 0.98 }}
             className="w-full py-3 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 text-white rounded-lg font-semibold transition-all duration-300 transform hover:shadow-[0_0_15px_rgba(16,185,129,0.5)] flex items-center justify-center gap-2"
             onClick={resetQuiz}
+            disabled={loading}
           >
             <Award className="h-5 w-5" />
             Continue Learning
           </motion.button>
         </motion.div>
       )}
-
-      <ToastContainer 
-        position="top-right"
-        autoClose={3000}
-        hideProgressBar={false}
-        newestOnTop={false}
-        closeOnClick
-        rtl={false}
-        pauseOnFocusLoss
-        draggable
-        pauseOnHover
-        theme="dark"
-      />
     </>
   );
 }

@@ -127,7 +127,7 @@ Questions: ${JSON.stringify(questions)}
 Generate strengths, weaknesses, and recommended resources. Return a JSON object with:
 - strengths: A string describing areas where the user performed well (e.g., based on correct answers, especially high-mark questions).
 - weaknesses: A string describing areas where the user struggled (e.g., based on incorrect answers, patterns in mistakes).
-- resources: An array of objects with title and url for recommended learning resources (YouTube videos, documentation) tailored to the weaknesses and topic.
+- resources: An array of objects with title and url for recommended learning resources (YouTube videos, documentation) tailored to the weaknesses and topic make sure there are highly accurate and according to the weaknesses only and the page must exist.
 
 Example format:
 {
