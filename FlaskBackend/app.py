@@ -6,6 +6,12 @@ from dotenv import load_dotenv
 from pypdf import PdfReader
 import google.generativeai as genai
 import json
+import numpy as np
+from pinecone import Pinecone, ServerlessSpec
+from langchain.text_splitter import RecursiveCharacterTextSplitter
+import time
+from youtube_transcript_api import YouTubeTranscriptApi
+from urllib.parse import urlparse, parse_qs
 
 app = Flask(__name__)
 CORS(app)
@@ -15,11 +21,18 @@ print("Starting Flask application...")
 # Load environment variables before anything else
 load_dotenv()
 
-# Configure API key and check if it exists
+# Configure API keys and check if they exist
 GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
+PINECONE_API_KEY = os.getenv('PINECONE_API_KEY')
+PINECONE_ENV = os.getenv('PINECONE_ENV')
+PINECONE_INDEX_NAME = os.getenv('PINECONE_INDEX_NAME', 'pdf-embeddings')
 
 if not GEMINI_API_KEY:
     raise ValueError("GEMINI_API_KEY not found in environment variables")
+if not PINECONE_API_KEY:
+    raise ValueError("PINECONE_API_KEY not found in environment variables")
+if not PINECONE_ENV:
+    raise ValueError("PINECONE_ENV not found in environment variables")
 
 # Initialize Gemini
 print("Configuring Gemini API...")
@@ -132,8 +145,9 @@ app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
 
 def process_pdf(file_path):
-    """Process PDF and get summary from Gemini"""
+    """Process PDF and create vector store in Pinecone"""
     print(f"Starting to process PDF: {file_path}")
+    
     # Read PDF
     pdf_reader = PdfReader(file_path)
     text = ""
@@ -302,9 +316,8 @@ def chat():
         }), 200
         
     except Exception as e:
-        print(f"Error during Gemini API call: {str(e)}")
-        print(f"Full error details: {repr(e)}")
-        raise Exception(f"Failed to generate summary: {str(e)}")
+        print(f"Error in chat endpoint: {str(e)}")
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/upload', methods=['POST'])
 def upload_file():
@@ -335,7 +348,8 @@ def upload_file():
             return jsonify({
                 'message': 'File processed successfully',
                 'summary': result['summary'],
-                'page_count': result['page_count']
+                'page_count': result['page_count'],
+                'chunk_count': result['chunk_count']
             }), 200
             
         except Exception as e:
@@ -351,6 +365,102 @@ def upload_file():
 @app.route('/health', methods=['GET'])
 def health_check():
     return jsonify({'status': 'healthy', 'message': 'Service is running'}), 200
+
+def extract_video_id(youtube_url):
+    """Extract video ID from YouTube URL"""
+    # Handle different URL formats
+    parsed_url = urlparse(youtube_url)
+    if parsed_url.hostname in ('youtu.be', 'www.youtu.be'):
+        return parsed_url.path[1:]
+    if parsed_url.hostname in ('youtube.com', 'www.youtube.com'):
+        if parsed_url.path == '/watch':
+            return parse_qs(parsed_url.query)['v'][0]
+        if parsed_url.path.startswith(('/embed/', '/v/')):
+            return parsed_url.path.split('/')[2]
+    return None
+
+def get_youtube_transcript(video_id):
+    """Get transcript of YouTube video"""
+    try:
+        transcript_list = YouTubeTranscriptApi.get_transcript(video_id)
+        return ' '.join([entry['text'] for entry in transcript_list])
+    except Exception as e:
+        print(f"Error getting YouTube transcript: {str(e)}")
+        raise
+
+def process_youtube_video(youtube_url):
+    """Process YouTube video and generate summary"""
+    print(f"Processing YouTube video: {youtube_url}")
+    
+    # Extract video ID
+    video_id = extract_video_id(youtube_url)
+    if not video_id:
+        raise ValueError("Invalid YouTube URL")
+    
+    # Get transcript
+    transcript = get_youtube_transcript(video_id)
+    print(f"Retrieved transcript of length: {len(transcript)} characters")
+    
+    # Generate summary using the same format as PDF
+    summary_prompt = f"""Please provide a comprehensive summary of the following video transcript. Format your response using these rules:
+1. Use ** ** for bold text (e.g., **Important Topic**)
+2. Use single * at the start of a line for bullet points
+3. Use clear section headers in bold (e.g., **1. Main Topics and Key Points:**)
+4. Organize the content with proper spacing between sections
+
+Include:
+**1. Main Topics and Key Points:**
+* Key topics and main ideas
+* Important concepts discussed
+* Core arguments or themes
+
+**2. Important Findings or Conclusions:**
+* Major findings
+* Key conclusions
+* Significant points
+
+**3. Key Takeaways:**
+* Notable insights
+* Important lessons
+* Main messages
+
+**4. Additional Notes:**
+* Any technical details
+* Interesting examples
+* Relevant context
+
+Video transcript:
+{transcript[:5000]}  # Using first 5000 chars for summary"""
+    
+    response = model.generate_content(summary_prompt)
+    
+    return {
+        'summary': response.text,
+        'transcript_length': len(transcript)
+    }
+
+@app.route('/process-youtube', methods=['POST'])
+def process_youtube():
+    try:
+        data = request.json
+        if not data or 'youtube_url' not in data:
+            return jsonify({'error': 'No YouTube URL provided'}), 400
+        
+        youtube_url = data['youtube_url']
+        print(f"Received YouTube URL: {youtube_url}")
+        
+        # Process the YouTube video
+        result = process_youtube_video(youtube_url)
+        
+        return jsonify({
+            'message': 'YouTube video processed successfully',
+            'summary': result['summary'],
+            'transcript_length': result['transcript_length']
+        }), 200
+        
+    except Exception as e:
+        print(f"Error processing YouTube video: {str(e)}")
+        return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
     app.run(debug=True)
