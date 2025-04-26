@@ -12,7 +12,7 @@ class LearningController {
             return res.status(401).json({ status: 'error', error: 'No token provided' });
         }
         try {
-            const decoded = jwt.verify(token, process.env.JWT_SECRET);
+            const decoded = jwt.verify(token, process.env.JWT_SECRET);;
             const email = decoded.email;
             const user = await User.findOne({ email }).select('-password');
             if (!user) {
@@ -20,6 +20,7 @@ class LearningController {
             }
             return user;
         } catch (error) {
+            console.error('Token verification error:', error);
             return res.status(401).json({ status: 'error', error: 'invalid token' });
         }
     }

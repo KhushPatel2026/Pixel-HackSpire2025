@@ -6,13 +6,14 @@ const userSchema = new mongoose.Schema({
     password: { type: String, required: true },
     learningPreferences: {
         preferredDifficulty: { type: String, enum: ['Easy', 'Medium', 'Hard'], default: 'Medium' },
-        learningStyle: { type: String, enum: ['Visual', 'Auditory', 'Kinesthetic', 'Reading/Writing'] },
-        dailyStudyTime: { type: Number } // In minutes
+        dailyStudyTime: { type: Number },
+        preferredLearningStyle: { type: String, enum: ['Documents', 'Audio&Video'], default: 'Documents' },
+        age: { type: Number },
     },
     progressMetrics: {
         totalCourses: { type: Number, default: 0 },
         completedCourses: { type: Number, default: 0 },
-        totalStudyTime: { type: Number, default: 0 } // In hours
+        totalStudyTime: { type: Number, default: 0 } 
     }
 });
 
