@@ -8,6 +8,7 @@ const authRoutes = require('./routes/authRoutes');
 const profileRoutes = require('./routes/profileRoutes');
 const socialAuthRoutes = require('./routes/socialAuthRoute');
 const learningRoutes = require('./Routes/learningRoutes');
+const quizRoutes = require('./Routes/quizRoutes');
 const passport = require('./utils/passportConfig');
 const session = require('express-session');
 const path = require('path')
@@ -35,6 +36,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api', profileRoutes);
 app.use('/auth', socialAuthRoutes);
 app.use('/api/learning', learningRoutes);
+app.use('/api/quiz', quizRoutes);
 
 app.listen(3000, () => {
     console.log('Server started on 3000');

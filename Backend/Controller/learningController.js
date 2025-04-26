@@ -1,6 +1,5 @@
 const Chatbot = require('../model/Chatbot');
 const LearningPath = require('../model/LearningPath');
-const Quiz = require('../model/Quiz');
 const User = require('../model/User');
 const jwt = require('jsonwebtoken');
 const aiService = require('../utils/aiService');
@@ -154,116 +153,6 @@ class LearningController {
             });
         } catch (error) {
             res.status(500).json({ status: 'error', error: error.message || 'Failed to process chat' });
-        }
-    }
-
-    async generateQuiz(req, res) {
-        try {
-            const token = req.headers['x-access-token'];
-            const user = await this.verifyToken(token, res);
-            if (res.headersSent) return;
-
-            const { topicName, difficultyLevel, numQuestions = 5 } = req.body;
-            if (!topicName || !difficultyLevel) {
-                return res.status(400).json({ status: 'error', error: 'topicName and difficultyLevel are required' });
-            }
-
-            const quizData = await aiService.generateSmartQuiz(topicName, difficultyLevel, numQuestions);
-
-            const quiz = new Quiz({
-                userId: user._id,
-                topicName,
-                difficultyLevel,
-                questions: quizData.questions,
-                quizTime: quizData.duration,
-                quizDate: new Date(),
-                quizResult: 'Pending',
-                quizScore: 0
-            });
-
-            await quiz.save();
-
-            const learningPath = await LearningPath.findOneAndUpdate(
-                { userId: user._id, courseName: topicName },
-                { $push: { quizzes: { quizId: quiz._id } } },
-                { new: true }
-            );
-
-            if (!learningPath) {
-                return res.status(404).json({ status: 'error', error: 'Learning path not found for this topic' });
-            }
-
-            res.json({ status: 'ok', data: quiz });
-        } catch (error) {
-            res.status(500).json({ status: 'error', error: error.message || 'Failed to generate quiz' });
-        }
-    }
-
-    async submitQuiz(req, res) {
-        try {
-            const token = req.headers['x-access-token'];
-            const user = await this.verifyToken(token, res);
-            if (res.headersSent) return;
-
-            const { quizId, responses } = req.body;
-            if (!quizId || !responses || !Array.isArray(responses)) {
-                return res.status(400).json({ status: 'error', error: 'quizId and responses array are required' });
-            }
-
-            const quiz = await Quiz.findById(quizId);
-            if (!quiz) {
-                return res.status(404).json({ status: 'error', error: 'Quiz not found' });
-            }
-
-            let totalMarks = 0;
-            const processedResponses = responses.map((response, index) => {
-                const question = quiz.questions[index];
-                if (!question) {
-                    throw new Error(`Invalid question index: ${index}`);
-                }
-                const isCorrect = response.selectedOption === question.correctAnswer;
-                const marksObtained = isCorrect ? question.marks : 0;
-                totalMarks += marksObtained;
-
-                return {
-                    ...response,
-                    isCorrect,
-                    marksObtained,
-                    feedback: isCorrect ? 'Correct!' : `Incorrect. ${question.aiGeneratedExplanation || 'Please review the topic.'}`
-                };
-            });
-
-            quiz.responses = processedResponses;
-            quiz.quizScore = totalMarks;
-            quiz.quizResult = totalMarks >= quiz.questions.length * 0.7 ? 'Pass' : 'Fail';
-            quiz.completedTime = new Date();
-
-            await quiz.save();
-
-            const learningPath = await LearningPath.findOneAndUpdate(
-                { userId: user._id, 'quizzes.quizId': quizId },
-                {
-                    $set: { 'quizzes.$.completed': true },
-                    $inc: { courseScore: totalMarks, 'gamification.points': totalMarks * 10 }
-                },
-                { new: true }
-            );
-
-            if (!learningPath) {
-                return res.status(404).json({ status: 'error', error: 'Learning path not found for this quiz' });
-            }
-
-            const completedTopics = learningPath.topics.filter(t => t.completionStatus).length;
-            learningPath.courseCompletionStatus = Math.round((completedTopics / learningPath.topics.length) * 100);
-            if (learningPath.courseCompletionStatus === 100) {
-                learningPath.courseCompletionDate = new Date();
-                await User.findByIdAndUpdate(user._id, { $inc: { 'progressMetrics.completedCourses': 1 } });
-            }
-            await learningPath.save();
-
-            res.json({ status: 'ok', data: { quiz, message: 'Quiz submitted successfully' } });
-        } catch (error) {
-            res.status(500).json({ status: 'error', error: error.message || 'Failed to submit quiz' });
         }
     }
 

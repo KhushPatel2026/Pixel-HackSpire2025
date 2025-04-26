@@ -4,16 +4,20 @@ import { BookOpen, ChevronRight, Clock, Brain, BarChart3 } from 'lucide-react';
 import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 
-const OnboardingProcess = ({ userId, onComplete }) => {
-  // State management
+const OnboardingProcess = ({ onComplete }) => {
   const [currentStep, setCurrentStep] = useState(0);
   const [difficultyLevel, setDifficultyLevel] = useState('');
   const [learningStyle, setLearningStyle] = useState('');
   const [studyTime, setStudyTime] = useState('');
   const [stars, setStars] = useState([]);
+  const [isLoading, setIsLoading] = useState(false);
 
-  // Generate stars for background effect (matching the login page)
   useEffect(() => {
+    const savedStep = localStorage.getItem('onboardingStep');
+    if (savedStep) {
+      setCurrentStep(parseInt(savedStep));
+    }
+
     const generateStars = () => {
       const newStars = [];
       for (let i = 0; i < 100; i++) {
@@ -32,80 +36,90 @@ const OnboardingProcess = ({ userId, onComplete }) => {
     generateStars();
   }, []);
 
-  // Handle navigation between steps
+  useEffect(() => {
+    localStorage.setItem('onboardingStep', currentStep);
+  }, [currentStep]);
+
   const handleNext = () => {
     if (currentStep === 1 && !difficultyLevel) {
-      toast.warning("Please select a difficulty level");
+      toast.warning('Please select a difficulty level');
       return;
     }
     if (currentStep === 2 && !learningStyle) {
-      toast.warning("Please select a learning style");
+      toast.warning('Please select a learning style');
       return;
     }
     if (currentStep === 3 && !studyTime) {
-      toast.warning("Please select your daily study time");
+      toast.warning('Please select your daily study time');
       return;
     }
     setCurrentStep(currentStep + 1);
   };
 
-  // Handle completion of onboarding
   const handleComplete = async () => {
+    setIsLoading(true);
     try {
-      // Save user preferences to backend
-      const response = await fetch('/api/user/preferences', {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        throw new Error('No authentication token found');
+      }
+
+      const response = await fetch('http://localhost:3000/api/profile/user/preferences', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'x-access-token': token,
         },
         body: JSON.stringify({
-          userId,
           difficultyLevel,
           learningStyle,
-          studyTime
+          studyTime,
         }),
       });
-      
+
+      const data = await response.json();
       if (!response.ok) {
-        throw new Error('Failed to save preferences');
+        throw new Error(data.error || 'Failed to save preferences');
       }
-      
-      toast.success("Your preferences have been saved!");
-      
-      // Notify parent component that onboarding is complete
+
+      toast.success('Your preferences have been saved!');
+      localStorage.removeItem('onboardingStep');
       if (onComplete) {
         setTimeout(() => {
           onComplete();
         }, 1500);
       }
     } catch (error) {
-      toast.error("Something went wrong. Please try again.");
+      toast.error(error.message || 'Something went wrong. Please try again.');
       console.error(error);
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  // Step components
   const steps = [
-    // Welcome step
     {
-      title: "Welcome to LearnFlow",
-      description: "Let's personalize your learning experience with three quick questions.",
+      title: 'Welcome to LearnFlow',
+      description: 'Let\'s personalize your learning experience with three quick questions.',
       icon: <BookOpen className="h-10 w-10 text-green-400" />,
       content: (
         <motion.button
           whileHover={{ scale: 1.02 }}
           whileTap={{ scale: 0.98 }}
           onClick={() => setCurrentStep(1)}
+          onKeyDown={(e) => e.key === 'Enter' && setCurrentStep(1)}
+          role="button"
+          tabIndex={0}
+          aria-label="Start onboarding"
           className="w-full py-3 mt-8 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 text-white rounded-lg font-semibold transition-all duration-300 transform hover:shadow-[0_0_15px_rgba(16,185,129,0.5)] flex items-center justify-center gap-2"
         >
           Get Started <ChevronRight className="h-5 w-5" />
         </motion.button>
-      )
+      ),
     },
-    // Difficulty level step
     {
-      title: "What difficulty level do you prefer?",
-      description: "This helps us adjust the complexity of content and quizzes.",
+      title: 'What difficulty level do you prefer?',
+      description: 'This helps us adjust the complexity of content and quizzes.',
       icon: <BarChart3 className="h-10 w-10 text-green-400" />,
       content: (
         <div className="grid grid-cols-3 gap-3 mt-6">
@@ -115,6 +129,10 @@ const OnboardingProcess = ({ userId, onComplete }) => {
               whileHover={{ scale: 1.03 }}
               whileTap={{ scale: 0.97 }}
               onClick={() => setDifficultyLevel(level)}
+              onKeyDown={(e) => e.key === 'Enter' && setDifficultyLevel(level)}
+              role="button"
+              tabIndex={0}
+              aria-label={`Select ${level} difficulty`}
               className={`py-4 px-2 rounded-lg font-medium transition-all duration-300 flex flex-col items-center justify-center gap-2 ${
                 difficultyLevel === level
                   ? 'bg-gradient-to-r from-green-600 to-emerald-600 text-white'
@@ -125,12 +143,11 @@ const OnboardingProcess = ({ userId, onComplete }) => {
             </motion.button>
           ))}
         </div>
-      )
+      ),
     },
-    // Learning style step
     {
-      title: "What's your preferred learning style?",
-      description: "We'll deliver content in your preferred format.",
+      title: 'What\'s your preferred learning style?',
+      description: 'We\'ll deliver content in your preferred format.',
       icon: <Brain className="h-10 w-10 text-green-400" />,
       content: (
         <div className="grid grid-cols-2 gap-3 mt-6">
@@ -138,13 +155,17 @@ const OnboardingProcess = ({ userId, onComplete }) => {
             { name: 'Visual', desc: 'Images & diagrams' },
             { name: 'Auditory', desc: 'Sound & speech' },
             { name: 'Reading/Writing', desc: 'Written content' },
-            { name: 'Kinesthetic', desc: 'Hands-on activities' }
+            { name: 'Kinesthetic', desc: 'Hands-on activities' },
           ].map((style) => (
             <motion.button
               key={style.name}
               whileHover={{ scale: 1.03 }}
               whileTap={{ scale: 0.97 }}
               onClick={() => setLearningStyle(style.name)}
+              onKeyDown={(e) => e.key === 'Enter' && setLearningStyle(style.name)}
+              role="button"
+              tabIndex={0}
+              aria-label={`Select ${style.name} learning style`}
               className={`py-4 px-3 rounded-lg font-medium transition-all duration-300 flex flex-col items-center text-center justify-center ${
                 learningStyle === style.name
                   ? 'bg-gradient-to-r from-green-600 to-emerald-600 text-white'
@@ -156,12 +177,11 @@ const OnboardingProcess = ({ userId, onComplete }) => {
             </motion.button>
           ))}
         </div>
-      )
+      ),
     },
-    // Study time step
     {
-      title: "How much time can you dedicate daily?",
-      description: "We'll recommend study schedules based on your available time.",
+      title: 'How much time can you dedicate daily?',
+      description: 'We\'ll recommend study schedules based on your available time.',
       icon: <Clock className="h-10 w-10 text-green-400" />,
       content: (
         <div className="grid grid-cols-3 gap-3 mt-6">
@@ -171,6 +191,10 @@ const OnboardingProcess = ({ userId, onComplete }) => {
               whileHover={{ scale: 1.03 }}
               whileTap={{ scale: 0.97 }}
               onClick={() => setStudyTime(time)}
+              onKeyDown={(e) => e.key === 'Enter' && setStudyTime(time)}
+              role="button"
+              tabIndex={0}
+              aria-label={`Select ${time} daily study time`}
               className={`py-4 px-2 rounded-lg font-medium transition-all duration-300 flex items-center justify-center ${
                 studyTime === time
                   ? 'bg-gradient-to-r from-green-600 to-emerald-600 text-white'
@@ -181,12 +205,11 @@ const OnboardingProcess = ({ userId, onComplete }) => {
             </motion.button>
           ))}
         </div>
-      )
+      ),
     },
-    // Completion step
     {
-      title: "All set! Your journey begins",
-      description: "We've personalized your learning experience based on your preferences.",
+      title: 'All set! Your journey begins',
+      description: 'We\'ve personalized your learning experience based on your preferences.',
       icon: <BookOpen className="h-10 w-10 text-green-400" />,
       content: (
         <motion.div
@@ -219,18 +242,24 @@ const OnboardingProcess = ({ userId, onComplete }) => {
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
             onClick={handleComplete}
-            className="w-full py-3 mt-8 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 text-white rounded-lg font-semibold transition-all duration-300 transform hover:shadow-[0_0_15px_rgba(16,185,129,0.5)] flex items-center justify-center gap-2"
+            onKeyDown={(e) => e.key === 'Enter' && handleComplete()}
+            role="button"
+            tabIndex={0}
+            aria-label="Start learning"
+            disabled={isLoading}
+            className={`w-full py-3 mt-8 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 text-white rounded-lg font-semibold transition-all duration-300 transform hover:shadow-[0_0_15px_rgba(16,185,129,0.5)] flex items-center justify-center gap-2 ${
+              isLoading ? 'opacity-50 cursor-not-allowed' : ''
+            }`}
           >
-            Start Learning
+            {isLoading ? 'Saving...' : 'Start Learning'}
           </motion.button>
         </motion.div>
-      )
-    }
+      ),
+    },
   ];
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#0a1a0a] via-[#0d150d] to-[#091409] text-white overflow-hidden">
-      {/* Stars background */}
       <div className="fixed inset-0 z-0 overflow-hidden">
         {stars.map((star) => (
           <div
@@ -247,7 +276,6 @@ const OnboardingProcess = ({ userId, onComplete }) => {
         ))}
       </div>
 
-      {/* Mesh gradient overlays */}
       <div className="fixed inset-0 z-0 bg-gradient-radial from-[#0d400d80] via-transparent to-transparent opacity-50" />
       <div className="fixed inset-0 z-0 bg-gradient-radial from-[#1e8f1e80] via-transparent to-transparent opacity-50 translate-x-1/2" />
       <div className="fixed inset-0 z-0 bg-gradient-radial from-[#00510080] via-transparent to-transparent opacity-40 translate-y-1/4" />
@@ -256,14 +284,12 @@ const OnboardingProcess = ({ userId, onComplete }) => {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.6 }}
-        className="w-full max-w-md p-1 bg-gradient-to-tr from-[#0d1f0d] to-[#153515] rounded-2xl shadow-2xl relative z-10"
+        className="w-full max-w-md lg:max-w-lg p-1 bg-gradient-to-tr from-[#0d1f0d] to-[#153515] rounded-2xl shadow-2xl relative z-10"
       >
         <div className="bg-[#0a1a0a]/90 backdrop-blur-lg p-8 rounded-2xl border border-green-500/20 relative overflow-hidden">
-          {/* Decorative elements */}
           <div className="absolute -right-20 top-0 w-40 h-40 rounded-full bg-gradient-to-r from-emerald-600/20 to-green-600/20 blur-3xl z-0" />
           <div className="absolute -left-20 bottom-0 w-40 h-40 rounded-full bg-gradient-to-r from-green-600/20 to-emerald-600/20 blur-3xl z-0" />
           
-          {/* Step progress indicator */}
           {currentStep > 0 && currentStep < steps.length - 1 && (
             <div className="flex justify-between mb-6 relative z-10">
               {[1, 2, 3].map((step) => (
@@ -323,18 +349,21 @@ const OnboardingProcess = ({ userId, onComplete }) => {
             {steps[currentStep].content}
           </motion.div>
           
-          {/* Navigation buttons */}
           {currentStep > 0 && currentStep < steps.length - 1 && (
-           <div className="flex justify-center mt-8">
-           <motion.button
-             whileHover={{ scale: 1.05 }}
-             whileTap={{ scale: 0.95 }}
-             onClick={handleNext}
-             className="px-4 py-2 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 text-white rounded-lg text-sm font-medium transition-all duration-300 transform hover:shadow-[0_0_10px_rgba(16,185,129,0.5)]"
-           >
-             Continue
-           </motion.button>
-         </div>
+            <div className="flex justify-center mt-8">
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={handleNext}
+                onKeyDown={(e) => e.key === 'Enter' && handleNext()}
+                role="button"
+                tabIndex={0}
+                aria-label="Continue to next step"
+                className="px-4 py-2 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 text-white rounded-lg text-sm font-medium transition-all duration-300 transform hover:shadow-[0_0_10px_rgba(16,185,129,0.5)]"
+              >
+                Continue
+              </motion.button>
+            </div>
           )}
         </div>
       </motion.div>
