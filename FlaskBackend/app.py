@@ -89,24 +89,43 @@ pc = Pinecone(api_key=PINECONE_API_KEY)
 
 # Create or get the index
 DIMENSION = 768  # dimension for embedding model
+DEFAULT_NAMESPACE = "default"  # Add default namespace
 
-# Check if index already exists, if not create it
-if PINECONE_INDEX_NAME not in pc.list_indexes().names():
-    print(f"Creating new Pinecone index: {PINECONE_INDEX_NAME}")
-    pc.create_index(
-        name=PINECONE_INDEX_NAME,
-        dimension=DIMENSION,
-        metric='cosine',
-        spec=ServerlessSpec(
-            cloud='aws',
-            region='us-west-2'
+try:
+    # Try to get existing index
+    print(f"Checking for existing index: {PINECONE_INDEX_NAME}")
+    existing_indexes = pc.list_indexes().names()
+    
+    if PINECONE_INDEX_NAME not in existing_indexes:
+        print(f"Creating new Pinecone index: {PINECONE_INDEX_NAME}")
+        pc.create_index(
+            name=PINECONE_INDEX_NAME,
+            dimension=DIMENSION,
+            metric='cosine',
+            spec=ServerlessSpec(
+                cloud='aws',
+                region='us-west-2'
+            )
         )
-    )
-    # Wait for index to be ready
-    time.sleep(10)
+        # Wait for index to be ready
+        print("Waiting for index to be ready...")
+        time.sleep(20)  # Give more time for index creation
+    
+    # Connect to the index
+    index = pc.Index(PINECONE_INDEX_NAME)
+    
+    # Test the connection with a simple operation
+    try:
+        stats = index.describe_index_stats()
+        print(f"Successfully connected to index. Stats: {stats}")
+    except Exception as e:
+        print(f"Error testing index connection: {str(e)}")
+        raise
+        
+except Exception as e:
+    print(f"Error initializing Pinecone: {str(e)}")
+    raise
 
-# Connect to the index
-index = pc.Index(PINECONE_INDEX_NAME)
 print("Pinecone index ready")
 
 # Initialize text splitter
@@ -145,30 +164,55 @@ def process_pdf(file_path):
     chunk_embeddings = batch_get_embeddings(chunks)
     print(f"Generated embeddings for {len(chunk_embeddings)} chunks")
     
-    # Prepare vectors for Pinecone
-    vectors = []
-    for i, (chunk, embedding) in enumerate(zip(chunks, chunk_embeddings)):
-        vectors.append({
-            'id': f'chunk_{i}',
-            'values': embedding,
-            'metadata': {
-                'text': chunk,
-                'page': i // len(pdf_reader.pages)
-            }
-        })
-    
-    # Clear existing vectors (if any) and upsert new ones
-    print("Clearing existing vectors...")
-    index.delete(delete_all=True)
-    
-    # Upsert in batches of 100
-    batch_size = 100
-    for i in range(0, len(vectors), batch_size):
-        batch = vectors[i:i + batch_size]
-        index.upsert(vectors=batch)
-        print(f"Uploaded batch {i//batch_size + 1} of {(len(vectors) + batch_size - 1)//batch_size}")
-    
-    print("Vectors uploaded to Pinecone successfully")
+    try:
+        # Prepare vectors for Pinecone
+        vectors = []
+        for i, (chunk, embedding) in enumerate(zip(chunks, chunk_embeddings)):
+            vectors.append({
+                'id': f'chunk_{i}',
+                'values': embedding,
+                'metadata': {
+                    'text': chunk,
+                    'page': i // len(pdf_reader.pages)
+                }
+            })
+        
+        # Clear existing vectors (if any) and upsert new ones
+        print("Clearing existing vectors...")
+        try:
+            # First, try to get stats to ensure the namespace exists
+            stats = index.describe_index_stats()
+            print(f"Current index stats: {stats}")
+            
+            # Then proceed with delete
+            index.delete(
+                delete_all=True,
+                namespace=DEFAULT_NAMESPACE
+            )
+        except Exception as e:
+            print(f"Warning during vector cleanup: {str(e)}")
+            # Continue even if delete fails (namespace might not exist yet)
+        
+        # Upsert in batches of 100
+        print("Upserting new vectors...")
+        batch_size = 100
+        for i in range(0, len(vectors), batch_size):
+            batch = vectors[i:i + batch_size]
+            try:
+                index.upsert(
+                    vectors=batch,
+                    namespace=DEFAULT_NAMESPACE
+                )
+                print(f"Uploaded batch {i//batch_size + 1} of {(len(vectors) + batch_size - 1)//batch_size}")
+            except Exception as e:
+                print(f"Error upserting batch: {str(e)}")
+                raise
+        
+        print("Vectors uploaded to Pinecone successfully")
+        
+    except Exception as e:
+        print(f"Error during vector operations: {str(e)}")
+        raise
     
     # Generate initial summary
     summary_prompt = f"""Please provide a comprehensive summary of the following document. Include:
@@ -192,19 +236,24 @@ Please structure the summary in a clear, organized manner."""
 
 def get_relevant_chunks(query, top_k=3):
     """Retrieve most relevant chunks for a query from Pinecone"""
-    # Get query embedding
-    query_embedding = get_embedding(query)
-    
-    # Search in Pinecone
-    results = index.query(
-        vector=query_embedding,
-        top_k=top_k,
-        include_metadata=True
-    )
-    
-    # Extract chunks from results
-    chunks = [match.metadata['text'] for match in results.matches]
-    return chunks
+    try:
+        # Get query embedding
+        query_embedding = get_embedding(query)
+        
+        # Search in Pinecone
+        results = index.query(
+            vector=query_embedding,
+            top_k=top_k,
+            include_metadata=True,
+            namespace=DEFAULT_NAMESPACE
+        )
+        
+        # Extract chunks from results
+        chunks = [match.metadata['text'] for match in results.matches]
+        return chunks
+    except Exception as e:
+        print(f"Error retrieving chunks: {str(e)}")
+        raise
 
 @app.route('/chat', methods=['POST'])
 def chat():
