@@ -60,7 +60,7 @@ function AuthComponent() {
                     if(isLogin==='Login') {
                     window.location.href = '/dashboard';
                     } else {
-                    window.location.href = '/chatbot';
+                    window.location.href = '/dashboard';
                     }
                 }, 1500);
             } else {
