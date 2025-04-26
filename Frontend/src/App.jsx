@@ -28,12 +28,14 @@ function App() {
   return (
     <div>
       <Logout />
+      <Logout />
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="/profile" element={<Profile />} />
         <Route path="/chatbot" element={<Chatbot />} />
       </Routes>
     </div>
+  );
   );
 }
 
