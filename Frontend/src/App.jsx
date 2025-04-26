@@ -7,6 +7,7 @@ import Login from './Pages/Authentication/Login/Login'
 import Profile from './Pages/Profile/Profile'
 import Chatbot from './Pages/Chatbot/Chatbot'
 import Logout from './Components/Logout'
+import Landing from './Pages/Landing/Landing'
 
 function App() {
   const navigate = useNavigate();
@@ -30,12 +31,12 @@ function App() {
       <Logout />
       <Logout />
       <Routes>
+        <route path="/" element={<Landing />} />
         <Route path="/login" element={<Login />} />
         <Route path="/profile" element={<Profile />} />
         <Route path="/chatbot" element={<Chatbot />} />
       </Routes>
     </div>
-  );
   );
 }
 
