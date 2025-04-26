@@ -20,7 +20,6 @@ class LearningController {
             }
             return user;
         } catch (error) {
-            console.error('Token verification error:', error.message);
             return res.status(401).json({ status: 'error', error: 'Invalid token' });
         }
     }
@@ -39,7 +38,6 @@ class LearningController {
             const simplifiedContent = await aiService.generateSimplifiedContent(content, contentType);
             res.json({ status: 'ok', data: simplifiedContent });
         } catch (error) {
-            console.error('simplifyContent error:', error.message);
             res.status(500).json({ status: 'error', error: error.message || 'Failed to simplify content' });
         }
     }
@@ -83,7 +81,6 @@ class LearningController {
             await User.findByIdAndUpdate(user._id, { $inc: { 'progressMetrics.totalCourses': 1 } });
             res.json({ status: 'ok', data: learningPath });
         } catch (error) {
-            console.error('generateLearningPath error:', error.message);
             res.status(500).json({ status: 'error', error: error.message || 'Failed to generate learning path' });
         }
     }
@@ -106,12 +103,10 @@ class LearningController {
                 if (!req.file) {
                     return res.status(400).json({ status: 'error', error: 'Audio file is required for voice input' });
                 }
-                console.log('Uploaded file:', { mimetype: req.file.mimetype, size: req.file.size });
                 try {
                     transcription = await aiService.transcribeAudio(req.file.buffer, req.file.mimetype);
                     question = transcription;
                 } catch (error) {
-                    console.error('Transcription failed:', error.message);
                     return res.status(400).json({ status: 'error', error: `Transcription failed: ${error.message}` });
                 }
             } else {
@@ -158,7 +153,6 @@ class LearningController {
                 } 
             });
         } catch (error) {
-            console.error('handleChat error:', error.message, error.stack);
             res.status(500).json({ status: 'error', error: error.message || 'Failed to process chat' });
         }
     }
@@ -201,7 +195,6 @@ class LearningController {
 
             res.json({ status: 'ok', data: quiz });
         } catch (error) {
-            console.error('generateQuiz error:', error.message);
             res.status(500).json({ status: 'error', error: error.message || 'Failed to generate quiz' });
         }
     }
@@ -270,7 +263,6 @@ class LearningController {
 
             res.json({ status: 'ok', data: { quiz, message: 'Quiz submitted successfully' } });
         } catch (error) {
-            console.error('submitQuiz error:', error.message);
             res.status(500).json({ status: 'error', error: error.message || 'Failed to submit quiz' });
         }
     }
@@ -298,7 +290,6 @@ class LearningController {
 
             res.json({ status: 'ok', data: progressData });
         } catch (error) {
-            console.error('getProgress error:', error.message);
             res.status(500).json({ status: 'error', error: error.message || 'Failed to fetch progress' });
         }
     }
@@ -339,7 +330,6 @@ class LearningController {
 
             res.json({ status: 'ok', data: dashboardData });
         } catch (error) {
-            console.error('getDashboardData error:', error.message);
             res.status(500).json({ status: 'error', error: error.message || 'Failed to fetch dashboard data' });
         }
     }

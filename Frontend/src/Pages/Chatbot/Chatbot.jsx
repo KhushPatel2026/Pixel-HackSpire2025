@@ -10,9 +10,18 @@ const Chatbot = () => {
     const mediaRecorderRef = useRef(null);
     const streamRef = useRef(null);
     const chatContainerRef = useRef(null);
+    const audioContextRef = useRef(null);
+    const analyserRef = useRef(null);
+    const silenceTimeoutRef = useRef(null);
+    const lastSoundTimeRef = useRef(null);
 
     const API_BASE_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3000';
     const token = localStorage.getItem('token');
+
+    // Silence detection parameters
+    const SILENCE_THRESHOLD = -50; // dB (adjustable, lower means quieter)
+    const SILENCE_DURATION = 2000; // 2 seconds in milliseconds
+    const CHECK_INTERVAL = 100; // Check every 100ms
 
     // Scroll to bottom of chat container
     useEffect(() => {
@@ -21,12 +30,54 @@ const Chatbot = () => {
         }
     }, [chatHistory]);
 
-    // Start recording audio
+    // Cleanup on component unmount
+    useEffect(() => {
+        return () => {
+            stopRecording();
+            if (audioContextRef.current) {
+                audioContextRef.current.close();
+                audioContextRef.current = null;
+            }
+        };
+    }, []);
+
+    // Start recording audio with silence detection
     const startRecording = async () => {
         try {
             streamRef.current = await navigator.mediaDevices.getUserMedia({ audio: true });
             mediaRecorderRef.current = new MediaRecorder(streamRef.current, { mimeType: 'audio/webm' });
             const chunks = [];
+
+            // Setup Web Audio API for silence detection
+            audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)();
+            analyserRef.current = audioContextRef.current.createAnalyser();
+            const source = audioContextRef.current.createMediaStreamSource(streamRef.current);
+            source.connect(analyserRef.current);
+            analyserRef.current.fftSize = 2048;
+            const dataArray = new Float32Array(analyserRef.current.frequencyBinCount);
+
+            // Silence detection loop
+            const checkSilence = () => {
+                if (!isRecording) return;
+
+                analyserRef.current.getFloatTimeDomainData(dataArray);
+                let sum = 0;
+                for (let i = 0; i < dataArray.length; i++) {
+                    sum += dataArray[i] * dataArray[i];
+                }
+                const rms = Math.sqrt(sum / dataArray.length);
+                const db = 20 * Math.log10(rms);
+
+                if (db > SILENCE_THRESHOLD) {
+                    lastSoundTimeRef.current = Date.now();
+                    clearTimeout(silenceTimeoutRef.current);
+                } else if (lastSoundTimeRef.current && Date.now() - lastSoundTimeRef.current >= SILENCE_DURATION) {
+                    handleVoiceToggle(); // Stop recording
+                    return;
+                }
+
+                setTimeout(checkSilence, CHECK_INTERVAL);
+            };
 
             mediaRecorderRef.current.ondataavailable = (event) => {
                 if (event.data.size > 0) {
@@ -35,13 +86,27 @@ const Chatbot = () => {
             };
 
             mediaRecorderRef.current.onstop = async () => {
+                clearTimeout(silenceTimeoutRef.current);
+                if (audioContextRef.current) {
+                    audioContextRef.current.close();
+                    audioContextRef.current = null;
+                }
+
                 const audioBlob = new Blob(chunks, { type: 'audio/webm' });
+                if (audioBlob.size < 1024) {
+                    setError('Recording too short or empty. Please speak clearly.');
+                    setIsThinking(false);
+                    setVoiceStatus('');
+                    return;
+                }
                 await sendAudioToBackend(audioBlob);
             };
 
             mediaRecorderRef.current.start();
+            lastSoundTimeRef.current = Date.now();
             setVoiceStatus('Recording... Speak now!');
             setError('');
+            setTimeout(checkSilence, CHECK_INTERVAL);
         } catch (error) {
             setError(`Microphone access error: ${error.message}`);
             setIsRecording(false);

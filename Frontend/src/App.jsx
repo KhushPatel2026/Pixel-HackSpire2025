@@ -8,6 +8,7 @@ import Profile from './Pages/Profile/Profile'
 import Chatbot from './Pages/Chatbot/Chatbot'
 import Logout from './Components/Logout'
 import Landing from './Pages/Landing/Landing'
+import QuizPage from './Pages/Quiz/Quiz'
 
 function App() {
   const navigate = useNavigate();
@@ -33,6 +34,7 @@ function App() {
       <Routes>
         <Route path="/" element={<Landing />} />
         <Route path="/login" element={<Login />} />
+        <Route path="/quiz" element={<QuizPage />} />
         <Route path="/profile" element={<Profile />} />
         <Route path="/chatbot" element={<Chatbot />} />
       </Routes>

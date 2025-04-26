@@ -50,12 +50,18 @@ Provide a response and a follow-up question (if appropriate). Format the respons
         const response = await result.response;
         const rawText = response.text();
 
+        // Log raw response for debugging
+        console.log('Raw AI response:', rawText);
+
         // Clean the response: remove markdown code blocks and extra whitespace
         let cleanedText = rawText
             .replace(/```json\s*\n?/, '') // Remove ```json
             .replace(/```\s*$/, '') // Remove closing ```
             .replace(/^\s+|\s+$/g, '') // Trim whitespace
             .replace(/\n/g, ''); // Remove newlines
+
+        // Log cleaned response
+        console.log('Cleaned AI response:', cleanedText);
 
         // Validate JSON
         try {
@@ -65,13 +71,15 @@ Provide a response and a follow-up question (if appropriate). Format the respons
             }
             return parsedResponse;
         } catch (parseError) {
-
+            console.error('JSON parse error:', parseError.message);
+            // Fallback: return a default response
             return {
                 answer: 'Sorry, I had trouble processing that. Could you rephrase your question?',
                 followUp: 'What else can I help with?'
             };
         }
     } catch (error) {
+        console.error('generateAIResponse error:', error.message);
         throw new Error(`AI response generation failed: ${error.message}`);
     }
 };
@@ -106,6 +114,7 @@ const transcribeAudio = async (audioBuffer, mimetype = 'audio/webm') => {
         if (!audioBuffer || audioBuffer.length < 1024) {
             throw new Error('Audio buffer is empty or too small');
         }
+        console.log('Input audio buffer size:', audioBuffer.length, 'Mimetype:', mimetype);
 
         // Determine input format based on mimetype
         const inputFormat = mimetype.includes('webm') ? 'webm' : mimetype.split('/')[1] || 'auto';
@@ -130,8 +139,9 @@ const transcribeAudio = async (audioBuffer, mimetype = 'audio/webm') => {
         });
 
         // Save WAV file for debugging
-        const outputWavPath = path.join(__dirname/audio, `output-${Date.now()}.wav`);
+        const outputWavPath = path.join(__dirname, `output-${Date.now()}.wav`);
         fs.writeFileSync(outputWavPath, wavBuffer);
+        console.log('WAV buffer size:', wavBuffer.length, 'Saved to:', outputWavPath);
 
         // Try transcribing with nova-2, fallback to nova if it fails
         let response;
@@ -141,12 +151,15 @@ const transcribeAudio = async (audioBuffer, mimetype = 'audio/webm') => {
                 { model: 'nova-2', language: 'en-US', smart_format: true }
             );
         } catch (err) {
-
+            console.warn('nova-2 failed, trying nova model:', err.message);
             response = await deepgram.listen.prerecorded.transcribeFile(
                 wavBuffer,
                 { model: 'nova', language: 'en-US', smart_format: true }
             );
         }
+
+        // Log full response
+        console.log('Deepgram Response:', JSON.stringify(response, null, 2));
 
         const { result, error } = response;
         if (error) {
@@ -157,6 +170,7 @@ const transcribeAudio = async (audioBuffer, mimetype = 'audio/webm') => {
         }
         return result.results.channels[0].alternatives[0].transcript || '';
     } catch (error) {
+        console.error('Transcription error:', error);
         throw new Error(`Deepgram transcription error: ${error.message}`);
     }
 };
