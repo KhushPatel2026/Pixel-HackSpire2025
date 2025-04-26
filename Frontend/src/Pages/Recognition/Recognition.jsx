@@ -210,38 +210,7 @@ export default function DocumentChat() {
       <div className="fixed inset-0 z-0 bg-gradient-radial from-[#2e8d2e80] via-transparent to-transparent opacity-60 -translate-x-1/3 translate-y-1/2" />
       <div className="fixed inset-0 z-0 bg-gradient-radial from-[#008f0080] via-transparent to-transparent opacity-60 translate-x-3/4 -translate-y-1/4" />
 
-<<<<<<< HEAD
-      <header className="fixed top-0 left-0 right-0 z-50 bg-gradient-to-b from-[#0a1a0a] to-transparent">
-=======
-<<<<<<< HEAD
-      {/* <header className="fixed top-0 left-0 right-0 z-50 bg-gradient-to-b from-[#0a1a0a] to-transparent">
->>>>>>> ee4f8a9a94573c8f7467ca6e4c36a4c34528fd65
-        <div className="container mx-auto px-4 py-4 flex justify-between items-center">
-          <div className="flex items-center space-x-2">
-            <BookOpen className="h-6 w-6 text-green-500" />
-            <span className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-green-500 to-emerald-500">
-              LearnFlow
-            </span>
-          </div>
-<<<<<<< HEAD
-          <button className="px-6 py-2 rounded-full bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 text-white font-medium transition-all duration-300 hover:shadow-[0_0_15px_rgba(16,185,129,0.5)] transform hover:scale-105">
-            Dashboard
-          </button>
-        </div>
-      </header>
 
-=======
-          <button
-            className="px-6 py-2 rounded-full bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 text-white font-medium transition-all duration-300 hover:shadow-[0_0_15px_rgba(16,185,129,0.5)] transform hover:scale-105"
-          >
-            Dashboard
-          </button>
-        </div>
-      </header> */}
-
-=======
->>>>>>> efbb98e3c293b6d068077d7682d9ca86b05e051f
->>>>>>> ee4f8a9a94573c8f7467ca6e4c36a4c34528fd65
       <main className="relative z-10 pt-20 pb-12 max-w-3xl mx-auto p-4">
         <h1 className="text-2xl font-bold mb-6 bg-clip-text text-transparent bg-gradient-to-r from-green-400 to-emerald-400">
           Document Chat
