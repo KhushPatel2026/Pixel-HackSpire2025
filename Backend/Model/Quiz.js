@@ -12,7 +12,6 @@ const quizSchema = new mongoose.Schema({
         correctAnswer: { type: String, required: true },
         questionType: { type: String, required: true, enum: ['MCQ', 'True/False', 'Short Answer'] },
         marks: { type: Number, required: true },
-        aiGeneratedExplanation: { type: String }
     }],
     responses: [{
         question: { type: String, required: true },
