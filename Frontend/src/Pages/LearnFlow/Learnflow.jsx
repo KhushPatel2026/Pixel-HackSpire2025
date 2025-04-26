@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { useParams, useLocation } from 'react-router-dom';
 import axios from 'axios';
-import QuizCore from '../../Components/QuizCore';
+import QuizCore from './QuizCore';
 import { Book, Link, CheckCircle } from 'lucide-react';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
@@ -16,6 +16,7 @@ export default function LearnFlow() {
   const [responses, setResponses] = useState([]);
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [isQuizLoading, setIsQuizLoading] = useState(false); // New state for quiz loading
   const [error, setError] = useState('');
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [showQuestionSelector, setShowQuestionSelector] = useState(false);
@@ -81,7 +82,7 @@ export default function LearnFlow() {
           .filter(t => t.completionStatus)
           .slice(-3)
           .map(t => t.topicName);
-        triggerQuiz(subtopicsForQuiz);
+        await triggerQuiz(subtopicsForQuiz);
       } else {
         const nextIndex = res.data.data.topics.findIndex(
           (t, i) => i > currentSubtopicIndex && !t.completionStatus
@@ -93,12 +94,13 @@ export default function LearnFlow() {
       const errorMessage = err.response?.data?.error || 'Failed to mark subtopic complete';
       setError(errorMessage);
       notifyError(errorMessage);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   const triggerQuiz = async (subtopicNames) => {
-    setLoading(true);
+    setIsQuizLoading(true); // Set quiz-specific loading state
     try {
       const res = await axios.post(
         'http://localhost:3000/api/learning/trigger-quiz',
@@ -114,8 +116,9 @@ export default function LearnFlow() {
       const errorMessage = err.response?.data?.error || 'Failed to trigger quiz';
       setError(errorMessage);
       notifyError(errorMessage);
+    } finally {
+      setIsQuizLoading(false); // Reset quiz loading state
     }
-    setLoading(false);
   };
 
   const submitQuiz = async () => {
@@ -158,8 +161,9 @@ export default function LearnFlow() {
       const errorMessage = err.response?.data?.error || 'Failed to submit quiz';
       setError(errorMessage);
       notifyError(errorMessage);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   const goToNextQuestion = () => {
@@ -208,8 +212,9 @@ export default function LearnFlow() {
       const errorMessage = err.response?.data?.error || 'Failed to simplify content';
       setError(errorMessage);
       notifyError(errorMessage);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   if (loading && !learningPath) return <p className="text-gray-300 text-center">Loading...</p>;
@@ -257,12 +262,36 @@ export default function LearnFlow() {
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
                   onClick={markSubtopicComplete}
-                  disabled={loading}
-                  className={`mt-4 px-4 py-2 rounded-lg ${
-                    loading ? 'opacity-50 cursor-not-allowed' : 'bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500'
+                  disabled={loading || isQuizLoading} // Disable during loading or quiz loading
+                  className={`mt-4 px-4 py-2 rounded-lg flex items-center gap-2 ${
+                    loading || isQuizLoading
+                      ? 'opacity-50 cursor-not-allowed'
+                      : 'bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500'
                   }`}
                 >
-                  {loading ? 'Updating...' : 'Mark as Complete'}
+                  {isQuizLoading ? (
+                    <>
+                      <svg
+                        className="animate-spin h-5 w-5 mr-2 text-white"
+                        viewBox="0 0 24 24"
+                      >
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path
+                          className="opacity-75"
+                          fill="currentColor"
+                          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                        />
+                      </svg>
+                      Loading Quiz...
+                    </>
+                  ) : loading ? (
+                    'Updating...'
+                  ) : (
+                    <>
+                      <CheckCircle className="h-5 w-5" />
+                      Mark as Complete
+                    </>
+                  )}
                 </motion.button>
               </div>
               <div className="p-6 bg-[#0d1f0d]/30 border border-green-900/30 rounded-lg">
