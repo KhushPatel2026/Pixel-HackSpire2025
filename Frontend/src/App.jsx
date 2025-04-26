@@ -14,6 +14,7 @@ import Sidebar from './Components/Sidebar';
 import OnbordingProcess from './Pages/Onboarding/OnboardingProcess';
 import Recognition from './Pages/Recognition/Recognition';
 import LearnFlow from './Pages/LearnFlow/LearnFlow';
+import Dashboard from './Pages/Dashboard/Dashboard';
 
 function App() {
   const navigate = useNavigate();
@@ -44,6 +45,7 @@ function App() {
           <Route path="/" element={<Landing />} />
           <Route path="/login" element={<Login />} />
           <Route path="/quiz" element={<QuizPage />} />
+          <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/quiz/custom" element={<CustomQuizPage />} />
           <Route path="/quiz/daily" element={<DailyQuizPage />} />
           <Route path="/onboarding" element={<OnbordingProcess />} />
