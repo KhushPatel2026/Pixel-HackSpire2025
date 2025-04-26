@@ -6,11 +6,12 @@ const learningPathSchema = new mongoose.Schema({
     topics: [{
         topicName: { type: String, required: true },
         topicDescription: { type: String, required: true },
-        topicResourceLink: [{ type: String }],
+        topicResourceLink: [{ title: String, url: String }],
         completionStatus: { type: Boolean, default: false },
         timeSpent: { type: Number, default: 0 },
         completionDate: { type: Date },
-        aiGeneratedSummary: { type: String }
+        aiGeneratedSummary: { type: String },
+        order: { type: Number, required: true } // Added for subtopic sequencing
     }],
     courseCompletionStatus: { type: Number, default: 0 },
     currentStep: { type: Number, default: 0 },
@@ -22,7 +23,8 @@ const learningPathSchema = new mongoose.Schema({
     courseDuration: { type: Number },
     quizzes: [{
         quizId: { type: mongoose.Schema.Types.ObjectId, required: true, ref: 'LearningPathQuiz' },
-        completed: { type: Boolean, default: false }
+        completed: { type: Boolean, default: false },
+        subtopicsCovered: [String] // Added to track subtopics tested
     }],
     difficultyLevel: { type: String, required: true, enum: ['Easy', 'Medium', 'Hard'] },
     gamification: {
