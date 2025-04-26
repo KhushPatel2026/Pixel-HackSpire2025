@@ -14,7 +14,8 @@ const learningPathQuizSchema = new mongoose.Schema({
         correctAnswer: { type: String, required: true },
         questionType: { type: String, default: 'MCQ', enum: ['MCQ'] },
         marks: { type: Number, required: true, min: 1 },
-        aiGeneratedExplanation: { type: String }
+        aiGeneratedExplanation: { type: String },
+        subtopic: { type: String, required: true }
     }],
     responses: [{
         question: { type: String, required: true },
@@ -22,13 +23,13 @@ const learningPathQuizSchema = new mongoose.Schema({
         isCorrect: { type: Boolean },
         marksObtained: { type: Number },
         responseTime: { type: Number, min: 0 },
-        feedback: { type: String }
+        feedback: { type: String },
+        resources: [{ title: String, url: String }]
     }],
     quizResult: { type: String, default: 'Pending', enum: ['Pending', 'Pass', 'Fail'] },
     quizScore: { type: Number, default: 0, min: 0 },
     strengths: { type: String },
-    weaknesses: { type: String },
-    reccommendedResources: { type: String },
+    weaknesses: { type: String }
 });
 
 module.exports = mongoose.model('LearningPathQuiz', learningPathQuizSchema);

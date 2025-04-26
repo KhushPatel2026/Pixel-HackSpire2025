@@ -4,6 +4,7 @@ const fs = require('fs');
 const path = require('path');
 const ffmpeg = require('fluent-ffmpeg');
 const { PassThrough } = require('stream');
+const fetch = require('node-fetch'); // Added for URL validation
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 const deepgram = createClient(process.env.DEEPGRAM_API_KEY);
@@ -25,10 +26,10 @@ const parseJsonSafely = (text, fallback, errorMessage) => {
     }
 };
 
-const isValidUrl = (url) => {
+const isValidUrl = async (url) => {
     try {
-        new URL(url);
-        return url.startsWith('http://') || url.startsWith('https://');
+        const response = await fetch(url, { method: 'HEAD', timeout: 5000 });
+        return response.ok && (url.startsWith('https://') || url.startsWith('http://'));
     } catch {
         return false;
     }
@@ -37,10 +38,11 @@ const isValidUrl = (url) => {
 const generateSimplifiedContent = async (content, contentType) => {
     try {
         const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
-        const prompt = `Simplify the following ${contentType} content for a student in a student-friendly way. Return a JSON object with:
+        const prompt = `
+Simplify the following ${contentType} content for a student, focusing strictly on the core concepts of the provided content. Avoid including loosely related or tangential topics. Return a JSON object with:
 - title: "Simplified Content"
-- content: Simplified explanation (string)
-- keyPoints: Array of key points (strings)
+- content: A clear, student-friendly explanation of the core ideas (string)
+- keyPoints: Array of 3-5 key points directly related to the core content (strings)
 Content: ${content}`;
         const result = await model.generateContent(prompt);
         const response = await result.response;
@@ -72,7 +74,8 @@ const generateAIResponse = async (question, chatHistory = []) => {
             .map(chat => `User: ${chat.question}\nAssistant: ${chat.answer}`)
             .join('\n\n');
         
-        const prompt = `You are a friendly, engaging learning assistant for the LearnFlow platform, designed to feel like a real person. Use a conversational, natural tone, as if chatting with a friend. Incorporate light humor or empathy where appropriate, and vary your response style to keep it fresh. Base your answer on the user's question and the recent chat history for context. Always aim to be helpful, clear, and concise. If relevant, ask a short follow-up question to keep the conversation flowing.
+        const prompt = `
+You are a friendly, engaging learning assistant for the LearnFlow platform, designed to feel like a real person. Use a conversational, natural tone, as if chatting with a friend. Incorporate light humor or empathy where appropriate, and vary your response style to keep it fresh. Answer the user's question by focusing strictly on the core topic of the question, avoiding loosely related or tangential subjects. Use the recent chat history for context to ensure relevance. Always aim to be helpful, clear, and concise. If relevant, ask a short follow-up question directly related to the core topic to keep the conversation flowing.
 
 Recent Chat History:
 ${context}
@@ -113,11 +116,11 @@ const generateAdaptivePath = async (userId, courseName, difficultyLevel, prefere
     try {
         const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
         const prompt = `
-Generate a personalized learning path for user ${userId} for the topic "${courseName}" with difficulty "${difficultyLevel}". Break it into 6-8 subtopics. For each subtopic and make it has all real resources and teach user o to 100, provide:
+Generate a personalized learning path for user ${userId} for the topic "${courseName}" at ${difficultyLevel} difficulty. Focus strictly on the core concepts of "${courseName}", avoiding loosely related or tangential topics. Break it into 6-8 subtopics, each designed to teach the user from 0 to 100 in that subtopic. For each subtopic, provide:
 - name: Subtopic name
-- description: Brief description (1-2 sentences)
-- resourceLinks: Array of 2-3 resources with title and url (YouTube videos, documentation)
-Consider preferences: ${JSON.stringify(preferences)}. Return a JSON object with topics, strength, weakness, and duration (in hours). Example:
+- description: Brief description (1-2 sentences) of the core subtopic
+- resourceLinks: Array of 2-3 highly relevant, existent resources (e.g., YouTube videos, official documentation) with title and URL, strictly related to the subtopic and verified to exist
+Consider preferences: ${JSON.stringify(preferences)}. Ensure all resource URLs are valid, accessible, and directly address the subtopic. Return a JSON object with topics, strength, weakness, and duration (in hours). Example:
 {
   "topics": [
     {
@@ -141,10 +144,8 @@ Consider preferences: ${JSON.stringify(preferences)}. Return a JSON object with 
             topics: [
                 {
                     name: `${courseName} Basics`,
-                    description: `Introduction to ${courseName}.`,
-                    resourceLinks: [
-                        { title: `Intro to ${courseName}`, url: 'https://example.com' }
-                    ]
+                    description: `Introduction to core concepts of ${courseName}.`,
+                    resourceLinks: []
                 }
             ],
             strength: 'Basic understanding',
@@ -158,15 +159,32 @@ Consider preferences: ${JSON.stringify(preferences)}. Return a JSON object with 
         }
 
         // Add order and validate resources
-        parsed.topics = parsed.topics.map((topic, index) => ({
-            name: topic.name || `Subtopic ${index + 1}`,
-            description: topic.description || `Learn about ${topic.name || 'this topic'}.`,
-            resourceLinks: Array.isArray(topic.resourceLinks)
-                ? topic.resourceLinks
-                    .filter(r => r.title && isValidUrl(r.url))
-                    .slice(0, 3)
-                : [{ title: `Intro to ${topic.name || 'Topic'}`, url: 'https://example.com' }],
-            order: index + 1
+        const fallbackResources = {
+            'JavaScript': [
+                { title: 'MDN JavaScript Guide', url: 'https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide' },
+                { title: 'freeCodeCamp JavaScript', url: 'https://www.youtube.com/watch?v=PkZNo7MFNFg' }
+            ],
+            'Mathematics': [
+                { title: 'Khan Academy Algebra', url: 'https://www.khanacademy.org/math/algebra' },
+                { title: '3Blue1Brown Linear Algebra', url: 'https://www.youtube.com/playlist?list=PLZHQObOWTQDPD3MizzM2xVFitgF8hE_ab' }
+            ]
+        };
+
+        parsed.topics = await Promise.all(parsed.topics.map(async (topic, index) => {
+            let resourceLinks = Array.isArray(topic.resourceLinks)
+                ? await Promise.all(topic.resourceLinks.map(async (r) => (await isValidUrl(r.url) ? r : null)).filter(Boolean))
+                : [];
+            
+            if (resourceLinks.length < 2 && fallbackResources[courseName]) {
+                resourceLinks = fallbackResources[courseName].slice(0, 3 - resourceLinks.length);
+            }
+
+            return {
+                name: topic.name || `Subtopic ${index + 1}`,
+                description: topic.description || `Learn core aspects of ${topic.name || 'this topic'}.`,
+                resourceLinks,
+                order: index + 1
+            };
         }));
 
         return parsed;
@@ -176,10 +194,8 @@ Consider preferences: ${JSON.stringify(preferences)}. Return a JSON object with 
             topics: [
                 {
                     name: `${courseName} Basics`,
-                    description: `Introduction to ${courseName}.`,
-                    resourceLinks: [
-                        { title: `Intro to ${courseName}`, url: 'https://example.com' }
-                    ],
+                    description: `Introduction to core concepts of ${courseName}.`,
+                    resourceLinks: [],
                     order: 1
                 }
             ],
@@ -194,13 +210,13 @@ const generateSmartQuiz = async (topicName, difficultyLevel, numQuestions, quizT
     try {
         const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
         const prompt = `
-Generate a ${quizType} quiz for the topic "${topicName}" with ${numQuestions} MCQ questions at ${difficultyLevel} difficulty. Each question must have:
-- question: Question text
+Generate a ${quizType} quiz for the topic "${topicName}" with ${numQuestions} MCQ questions at ${difficultyLevel} difficulty. Focus strictly on the core concepts of "${topicName}", avoiding loosely related or tangential topics. Each question must include:
+- question: Question text directly related to the core topic
 - options: Exactly 4 options
 - correctAnswer: One of the options
 - questionType: "MCQ"
 - marks: 1 for Easy, 2 for Medium, 3 for Hard
-- aiGeneratedExplanation: Explanation for the correct answer
+- aiGeneratedExplanation: Explanation for the correct answer, focusing on the core concept
 - subtopic: The specific subtopic within "${topicName}" (e.g., for JavaScript: "Variables", "Functions")
 Include duration (1 minute per question). Return a JSON object:
 {
@@ -225,12 +241,12 @@ Include duration (1 minute per question). Return a JSON object:
         const fallback = {
             questions: [
                 {
-                    question: `What is a basic concept in ${topicName}?`,
+                    question: `What is a core concept in ${topicName}?`,
                     options: ['Option 1', 'Option 2', 'Option 3', 'Option 4'],
                     correctAnswer: 'Option 1',
                     questionType: 'MCQ',
                     marks: difficultyLevel === 'Easy' ? 1 : difficultyLevel === 'Medium' ? 2 : 3,
-                    aiGeneratedExplanation: `This is a basic concept in ${topicName}.`,
+                    aiGeneratedExplanation: `This is a core concept in ${topicName}.`,
                     subtopic: `${topicName} Basics`
                 }
             ],
@@ -269,12 +285,12 @@ Include duration (1 minute per question). Return a JSON object:
         return {
             questions: [
                 {
-                    question: `What is a basic concept in ${topicName}?`,
+                    question: `What is a core concept in ${topicName}?`,
                     options: ['Option 1', 'Option 2', 'Option 3', 'Option 4'],
                     correctAnswer: 'Option 1',
                     questionType: 'MCQ',
                     marks: difficultyLevel === 'Easy' ? 1 : difficultyLevel === 'Medium' ? 2 : 3,
-                    aiGeneratedExplanation: `This is a basic concept in ${topicName}.`,
+                    aiGeneratedExplanation: `This is a core concept in ${topicName}.`,
                     subtopic: `${topicName} Basics`
                 }
             ],
@@ -304,7 +320,7 @@ const analyzeQuizPerformance = async (topicName, difficultyLevel, responses, que
 
         const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
         const prompt = `
-Analyze the quiz performance for a ${quizType} quiz on the topic "${topicName}" at ${difficultyLevel} difficulty. Below are the responses, questions, and performance metrics:
+Analyze the quiz performance for a ${quizType} quiz on the topic "${topicName}" at ${difficultyLevel} difficulty. Focus strictly on the core concepts of "${topicName}", avoiding loosely related or tangential topics. Below are the responses, questions, and performance metrics:
 
 Responses: ${JSON.stringify(responses)}
 Questions: ${JSON.stringify(questions)}
@@ -315,10 +331,10 @@ Performance Metrics:
 - Subtopic Breakdown: ${JSON.stringify(subtopicPerformance)}
 
 Generate:
-- strengths: Highlight strong subtopics (e.g., high accuracy).
-- weaknesses: Identify weak subtopics (e.g., low accuracy).
-- resources: Provide 2-4 resources (title, url) for weak subtopics.
-- remedialSubtopics: If score < 70%, suggest 2-3 remedial subtopics with name, description, and 1-2 resources.
+- strengths: Highlight strong subtopics (e.g., high accuracy) within the core topic.
+- weaknesses: Identify weak subtopics (e.g., low accuracy) within the core topic.
+- resources: Provide 2-4 highly relevant, existent resources (e.g., YouTube videos, official documentation) with title and URL, strictly tailored to the weak subtopics and verified to exist.
+- remedialSubtopics: If score < 70%, suggest 2-3 remedial subtopics within the core topic, each with name, description, and 1-2 highly relevant, existent resources.
 Return a JSON object:
 {
   "strengths": "Strength description",
@@ -343,22 +359,18 @@ Return a JSON object:
         const cleanedText = cleanJsonResponse(rawText);
         const fallback = {
             strengths: correctAnswers > totalQuestions * 0.7
-                ? `You performed well, correctly answering ${correctAnswers}/${totalQuestions} questions.`
+                ? `You performed well, correctly answering ${correctAnswers}/${totalQuestions} questions in ${topicName}.`
                 : 'No specific strengths identified.',
             weaknesses: incorrectAnswers > 0
-                ? `You struggled with ${incorrectAnswers} questions. Review "${topicName}" to improve.`
+                ? `You struggled with ${incorrectAnswers} questions in ${topicName}. Review core concepts to improve.`
                 : 'No specific weaknesses identified.',
-            resources: [
-                { title: `Intro to ${topicName}`, url: 'https://example.com' }
-            ],
+            resources: [],
             remedialSubtopics: scorePercentage < 70
                 ? [
                     {
                         name: `${topicName} Basics`,
                         description: `Review core concepts of ${topicName}.`,
-                        resourceLinks: [
-                            { title: `Intro to ${topicName}`, url: 'https://example.com' }
-                        ]
+                        resourceLinks: []
                     }
                 ]
                 : []
@@ -374,33 +386,48 @@ Return a JSON object:
             return fallback;
         }
 
-        parsed.resources = parsed.resources
-            .filter(r => r.title && isValidUrl(r.url))
-            .slice(0, 4);
-        parsed.remedialSubtopics = parsed.remedialSubtopics
-            .filter(st => st.name && st.description && Array.isArray(st.resourceLinks))
-            .map(st => ({
-                name: st.name,
-                description: st.description,
-                resourceLinks: st.resourceLinks
-                    .filter(r => r.title && isValidUrl(r.url))
-                    .slice(0, 2)
-            }));
+        parsed.resources = await Promise.all(
+            parsed.resources
+                .filter(r => r.title && r.url)
+                .map(async (r) => (await isValidUrl(r.url) ? r : null))
+                .filter(Boolean)
+        ).then(res => res.slice(0, 4));
+
+        parsed.remedialSubtopics = await Promise.all(
+            parsed.remedialSubtopics
+                .filter(st => st.name && st.description && Array.isArray(st.resourceLinks))
+                .map(async (st) => ({
+                    name: st.name,
+                    description: st.description,
+                    resourceLinks: await Promise.all(
+                        st.resourceLinks
+                            .filter(r => r.title && r.url)
+                            .map(async (r) => (await isValidUrl(r.url) ? r : null))
+                            .filter(Boolean)
+                    ).then(res => res.slice(0, 2))
+                }))
+        );
 
         // Add fallback resources if none provided
         const fallbackResources = {
             'JavaScript': [
-                { title: 'MDN JavaScript', url: 'https://developer.mozilla.org/en-US/docs/Web/JavaScript' },
+                { title: 'MDN JavaScript Guide', url: 'https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide' },
                 { title: 'freeCodeCamp JavaScript', url: 'https://www.youtube.com/watch?v=PkZNo7MFNFg' }
             ],
             'Mathematics': [
                 { title: 'Khan Academy Algebra', url: 'https://www.khanacademy.org/math/algebra' },
-                { title: '3Blue1Brown', url: 'https://www.youtube.com/@3blue1brown' }
+                { title: '3Blue1Brown Linear Algebra', url: 'https://www.youtube.com/playlist?list=PLZHQObOWTQDPD3MizzM2xVFitgF8hE_ab' }
             ]
         };
         if (parsed.resources.length === 0 && fallbackResources[topicName]) {
             parsed.resources = fallbackResources[topicName].slice(0, 4);
         }
+        parsed.remedialSubtopics = parsed.remedialSubtopics.map(st => {
+            if (st.resourceLinks.length === 0 && fallbackResources[topicName]) {
+                st.resourceLinks = fallbackResources[topicName].slice(0, 2);
+            }
+            return st;
+        });
 
         return parsed;
     } catch (error) {
@@ -408,9 +435,7 @@ Return a JSON object:
         return {
             strengths: 'No specific strengths identified.',
             weaknesses: 'No specific weaknesses identified.',
-            resources: [
-                { title: `Intro to ${topicName}`, url: 'https://example.com' }
-            ],
+            resources: [],
             remedialSubtopics: []
         };
     }

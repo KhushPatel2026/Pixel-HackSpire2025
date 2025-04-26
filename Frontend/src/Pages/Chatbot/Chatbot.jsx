@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { BookOpen, User, Mail, Lock, LogIn, UserPlus, Mic, Send, StopCircle } from 'lucide-react';
+import { motion } from 'framer-motion';
 
 const Chatbot = () => {
     const [question, setQuestion] = useState('');
@@ -14,23 +16,41 @@ const Chatbot = () => {
     const analyserRef = useRef(null);
     const silenceTimeoutRef = useRef(null);
     const lastSoundTimeRef = useRef(null);
+    
+    const [stars, setStars] = useState([]);
+    
+    useEffect(() => {
+        const generateStars = () => {
+            const newStars = [];
+            for (let i = 0; i < 150; i++) {
+                newStars.push({
+                    id: i,
+                    x: Math.random() * 100,
+                    y: Math.random() * 100,
+                    size: Math.random() * 2 + 1,
+                    opacity: Math.random() * 0.8 + 0.2,
+                    blinking: Math.random() > 0.7,
+                });
+            }
+            setStars(newStars);
+        };
+        
+        generateStars();
+    }, []);
 
     const API_BASE_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3000';
     const token = localStorage.getItem('token');
 
-    // Silence detection parameters
-    const SILENCE_THRESHOLD = -50; // dB (adjustable, lower means quieter)
-    const SILENCE_DURATION = 2000; // 2 seconds in milliseconds
-    const CHECK_INTERVAL = 100; // Check every 100ms
+    const SILENCE_THRESHOLD = -50;
+    const SILENCE_DURATION = 2000;
+    const CHECK_INTERVAL = 100;
 
-    // Scroll to bottom of chat container
     useEffect(() => {
         if (chatContainerRef.current) {
             chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
         }
     }, [chatHistory]);
 
-    // Cleanup on component unmount
     useEffect(() => {
         return () => {
             stopRecording();
@@ -41,14 +61,12 @@ const Chatbot = () => {
         };
     }, []);
 
-    // Start recording audio with silence detection
     const startRecording = async () => {
         try {
             streamRef.current = await navigator.mediaDevices.getUserMedia({ audio: true });
             mediaRecorderRef.current = new MediaRecorder(streamRef.current, { mimeType: 'audio/webm' });
             const chunks = [];
 
-            // Setup Web Audio API for silence detection
             audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)();
             analyserRef.current = audioContextRef.current.createAnalyser();
             const source = audioContextRef.current.createMediaStreamSource(streamRef.current);
@@ -56,7 +74,6 @@ const Chatbot = () => {
             analyserRef.current.fftSize = 2048;
             const dataArray = new Float32Array(analyserRef.current.frequencyBinCount);
 
-            // Silence detection loop
             const checkSilence = () => {
                 if (!isRecording) return;
 
@@ -72,7 +89,7 @@ const Chatbot = () => {
                     lastSoundTimeRef.current = Date.now();
                     clearTimeout(silenceTimeoutRef.current);
                 } else if (lastSoundTimeRef.current && Date.now() - lastSoundTimeRef.current >= SILENCE_DURATION) {
-                    handleVoiceToggle(); // Stop recording
+                    handleVoiceToggle();
                     return;
                 }
 
@@ -114,7 +131,6 @@ const Chatbot = () => {
         }
     };
 
-    // Stop recording audio
     const stopRecording = () => {
         if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
             mediaRecorderRef.current.stop();
@@ -125,7 +141,6 @@ const Chatbot = () => {
         }
     };
 
-    // Send audio to backend
     const sendAudioToBackend = async (audioBlob) => {
         if (!token) {
             setError('No authentication token found. Please log in.');
@@ -178,7 +193,6 @@ const Chatbot = () => {
         }
     };
 
-    // Handle text question
     const handleTextSubmit = async (e) => {
         e.preventDefault();
         if (!question.trim()) return;
@@ -235,7 +249,6 @@ const Chatbot = () => {
         }
     };
 
-    // Handle voice recording toggle
     const handleVoiceToggle = async () => {
         if (!isRecording) {
             setIsRecording(true);
@@ -251,105 +264,237 @@ const Chatbot = () => {
     };
 
     return (
-        <div className="bg-gray-100 flex items-center justify-center min-h-screen">
-            <div className="bg-white p-6 rounded-lg shadow-lg w-full max-w-md">
-                <h1 className="text-2xl font-bold text-center mb-4">LearnFlow Chatbot</h1>
-                <div
-                    ref={chatContainerRef}
-                    className="border border-gray-300 rounded-md p-4 bg-gray-50 max-h-[500px] overflow-y-auto mb-4"
-                >
-                    {chatHistory.map((chat, index) => (
-                        <div key={index} className="space-y-2 mb-4">
-                            <div className="chat-message user-message ml-auto bg-blue-100 p-3 rounded-lg max-w-[80%]">
-                                {chat.question}
-                            </div>
-                            {chat.answer && (
-                                <div className="chat-message bot-message mr-auto bg-gray-200 p-3 rounded-lg max-w-[80%]">
-                                    {chat.answer}
-                                    {chat.audioUrl && (
-                                        <audio controls src={chat.audioUrl} className="mt-2 w-full" />
-                                    )}
-                                    {chat.followUp && (
-                                        <div className="text-sm text-gray-600 mt-2">
-                                            Follow-up: {chat.followUp}
-                                        </div>
-                                    )}
-                                </div>
-                            )}
-                        </div>
-                    ))}
-                    {isThinking && (
-                        <div className="chat-message bot-message mr-auto bg-gray-200 p-3 rounded-lg max-w-[80%]">
-                            <span className="typing-indicator">...</span>
-                        </div>
-                    )}
-                    {chatHistory.length === 0 && !isThinking && (
-                        <div className="text-center text-gray-500">
-                            Start a conversation by typing or using voice input
-                        </div>
-                    )}
-                </div>
-                <form onSubmit={handleTextSubmit} className="flex space-x-2">
-                    <input
-                        type="text"
-                        value={question}
-                        onChange={(e) => setQuestion(e.target.value)}
-                        className="flex-1 p-2 border border-gray-300 rounded-md"
-                        placeholder="Type your question..."
-                        disabled={isThinking}
+        <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#0a1a0a] via-[#0d150d] to-[#091409] text-white overflow-hidden">
+            <div className="fixed inset-0 z-0 overflow-hidden">
+                {stars.map((star) => (
+                    <div
+                        key={star.id}
+                        className={`absolute rounded-full bg-green-200 ${star.blinking ? 'animate-pulse' : ''}`}
+                        style={{
+                            left: star.x + '%',
+                            top: star.y + '%',
+                            width: star.size + 'px',
+                            height: star.size + 'px',
+                            opacity: star.opacity,
+                        }}
                     />
-                    <button
-                        type="submit"
-                        className="bg-blue-600 text-white p-2 rounded-md hover:bg-blue-700 disabled:bg-blue-300"
-                        disabled={isThinking || !question.trim()}
-                    >
-                        Send
-                    </button>
-                    <button
-                        type="button"
-                        onClick={handleVoiceToggle}
-                        className={`p-2 rounded-md text-white ${
-                            isRecording
-                                ? 'bg-red-600 hover:bg-red-700'
-                                : 'bg-green-600 hover:bg-green-700'
-                        } disabled:bg-gray-400 disabled:opacity-50`}
-                        disabled={isThinking}
-                    >
-                        {isRecording ? 'Stop Voice' : 'Start Voice'}
-                    </button>
-                </form>
-                {voiceStatus && <p className="text-sm text-gray-600 mt-2">{voiceStatus}</p>}
-                {error && <p className="text-red-500 text-sm mt-2">{error}</p>}
-
-                <style>
-                    {`
-                        .chat-message {
-                            margin: 10px;
-                            padding: 10px;
-                            border-radius: 10px;
-                            max-width: 80%;
-                        }
-                        .user-message {
-                            background-color: #e0f7fa;
-                            margin-left: auto;
-                        }
-                        .bot-message {
-                            background-color: #f1f5f9;
-                            margin-right: auto;
-                        }
-                        .typing-indicator {
-                            display: inline-block;
-                            animation: typing 1s infinite;
-                        }
-                        @keyframes typing {
-                            0% { content: '.'; }
-                            33% { content: '..'; }
-                            66% { content: '...'; }
-                            100% { content: '.'; }
-                        }
-                    `}
-                </style>
+                ))}
             </div>
+
+            <div className="fixed inset-0 z-0 bg-gradient-radial from-[#0d400d80] via-transparent to-transparent opacity-50" />
+            <div className="fixed inset-0 z-0 bg-gradient-radial from-[#1e8f1e80] via-transparent to-transparent opacity-50 translate-x-1/2" />
+            <div className="fixed inset-0 z-0 bg-gradient-radial from-[#00510080] via-transparent to-transparent opacity-40 translate-y-1/4" />
+
+            <motion.div 
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.6 }}
+                className="w-full max-w-5xl p-1 bg-gradient-to-tr from-[#0d1f0d] to-[#153515] rounded-2xl shadow-2xl relative z-10 mx-4 h-[85vh]"
+            >
+                <div className="bg-[#0a1a0a]/90 backdrop-blur-lg p-6 rounded-2xl border border-green-500/20 relative h-full flex flex-col">
+                    <div className="absolute -right-20 top-0 w-40 h-40 rounded-full bg-gradient-to-r from-emerald-600/20 to-green-600/20 blur-3xl z-0" />
+                    <div className="absolute -left-20 bottom-0 w-40 h-40 rounded-full bg-gradient-to-r from-green-600/20 to-emerald-600/20 blur-3xl z-0" />
+                    
+                    <div className="flex items-center justify-center mb-4 relative z-10">
+                        <div className="p-2 bg-gradient-to-tr from-green-600/20 to-emerald-600/20 rounded-xl inline-block mr-4">
+                            <BookOpen className="h-6 w-6 text-green-400" />
+                        </div>
+                        <h1 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-green-400 to-emerald-400">
+                            LearnFlow Assistant
+                        </h1>
+                    </div>
+                    
+                    <div 
+                        ref={chatContainerRef}
+                        className="flex-1 overflow-y-auto mb-4 relative z-10 rounded-xl p-2 backdrop-blur-sm"
+                        style={{
+                            background: 'rgba(10, 26, 10, 0.3)',
+                            boxShadow: 'inset 0 0 30px rgba(0, 50, 0, 0.2)'
+                        }}
+                    >
+                        {chatHistory.map((chat, index) => (
+                            <div key={index} className="space-y-2 mb-4">
+                                <motion.div 
+                                    initial={{ opacity: 0, y: 10 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    transition={{ duration: 0.3 }}
+                                    className="chat-message user-message"
+                                >
+                                    {chat.question}
+                                </motion.div>
+                                {chat.answer && (
+                                    <motion.div 
+                                        initial={{ opacity: 0, y: 10 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        transition={{ duration: 0.3, delay: 0.2 }}
+                                        className="chat-message bot-message"
+                                    >
+                                        <div className="whitespace-pre-wrap">{chat.answer}</div>
+                                        {chat.audioUrl && (
+                                            <audio 
+                                                controls 
+                                                src={chat.audioUrl} 
+                                                className="mt-3 w-full opacity-80" 
+                                                style={{ 
+                                                    height: '36px',
+                                                    borderRadius: '18px',
+                                                    background: 'rgba(16, 185, 129, 0.1)'
+                                                }}
+                                            />
+                                        )}
+                                        {chat.followUp && (
+                                            <div className="text-sm text-green-300 mt-2 border-t border-green-900/20 pt-2">
+                                                <span className="font-medium">Follow-up suggestion:</span> {chat.followUp}
+                                            </div>
+                                        )}
+                                    </motion.div>
+                                )}
+                            </div>
+                        ))}
+                        {isThinking && (
+                            <motion.div 
+                                initial={{ opacity: 0, y: 10 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                className="chat-message bot-message"
+                            >
+                                <div className="typing-indicator">
+                                    <span></span>
+                                    <span></span>
+                                    <span></span>
+                                </div>
+                            </motion.div>
+                        )}
+                        {chatHistory.length === 0 && !isThinking && (
+                            <div className="flex flex-col items-center justify-center h-full text-center text-green-300 opacity-80">
+                                <div className="p-3 bg-gradient-to-tr from-green-600/10 to-emerald-600/10 rounded-full mb-4">
+                                    <BookOpen className="h-10 w-10 text-green-400" />
+                                </div>
+                                <p className="text-lg mb-2">Welcome to LearnFlow Assistant</p>
+                                <p className="text-sm max-w-md">Start a conversation by typing or using voice input</p>
+                            </div>
+                        )}
+                    </div>
+                    
+                    <div className="relative z-10">
+                        {voiceStatus && (
+                            <div className="text-sm text-green-300 mb-2 bg-[#0d1f0d]/50 p-2 rounded-lg inline-block">
+                                {voiceStatus}
+                            </div>
+                        )}
+                        {error && (
+                            <div className="text-sm text-red-400 mb-2 bg-[#1f0d0d]/50 p-2 rounded-lg">
+                                {error}
+                            </div>
+                        )}
+                        
+                        <form onSubmit={handleTextSubmit} className="flex space-x-2">
+                            <div className="relative flex-1">
+                                <input
+                                    type="text"
+                                    value={question}
+                                    onChange={(e) => setQuestion(e.target.value)}
+                                    className="w-full px-4 py-3 bg-[#0d1f0d]/50 border border-green-900/50 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500/50 focus:border-transparent transition-all duration-300"
+                                    placeholder="Type your question..."
+                                    disabled={isThinking}
+                                />
+                            </div>
+                            <motion.button
+                                type="submit"
+                                whileHover={{ scale: 1.05 }}
+                                whileTap={{ scale: 0.95 }}
+                                className="bg-gradient-to-r from-green-600 to-emerald-600 text-white p-3 rounded-lg hover:shadow-[0_0_15px_rgba(16,185,129,0.5)] disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300"
+                                disabled={isThinking || !question.trim()}
+                            >
+                                <Send className="h-5 w-5" />
+                            </motion.button>
+                            <motion.button
+                                type="button"
+                                onClick={handleVoiceToggle}
+                                whileHover={{ scale: 1.05 }}
+                                whileTap={{ scale: 0.95 }}
+                                className={`p-3 rounded-lg text-white transition-all duration-300 ${
+                                    isRecording
+                                        ? 'bg-red-600 hover:shadow-[0_0_15px_rgba(220,38,38,0.5)]'
+                                        : 'bg-gradient-to-r from-emerald-600 to-green-600 hover:shadow-[0_0_15px_rgba(16,185,129,0.5)]'
+                                } disabled:opacity-50 disabled:cursor-not-allowed`}
+                                disabled={isThinking}
+                            >
+                                {isRecording ? <StopCircle className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
+                            </motion.button>
+                        </form>
+                    </div>
+                </div>
+            </motion.div>
+
+            <style jsx>{`
+                .chat-message {
+                    margin: 10px;
+                    padding: 12px 16px;
+                    border-radius: 12px;
+                    max-width: 80%;
+                    line-height: 1.5;
+                }
+                .user-message {
+                    background: linear-gradient(135deg, rgba(16, 185, 129, 0.2), rgba(5, 150, 105, 0.15));
+                    border: 1px solid rgba(16, 185, 129, 0.2);
+                    margin-left: auto;
+                    color: #e0f2f1;
+                    box-shadow: 0 2px 10px rgba(0, 50, 0, 0.1);
+                }
+                .bot-message {
+                    background: rgba(15, 23, 42, 0.3);
+                    border: 1px solid rgba(16, 185, 129, 0.1);
+                    margin-right: auto;
+                    color: #f1f5f9;
+                    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+                }
+                .typing-indicator {
+                    display: flex;
+                    padding: 6px 0;
+                }
+                .typing-indicator span {
+                    height: 8px;
+                    width: 8px;
+                    margin: 0 2px;
+                    background-color: rgba(16, 185, 129, 0.6);
+                    border-radius: 50%;
+                    display: block;
+                    opacity: 0.4;
+                }
+                .typing-indicator span:nth-child(1) {
+                    animation: pulse 1s infinite 0.1s;
+                }
+                .typing-indicator span:nth-child(2) {
+                    animation: pulse 1s infinite 0.3s;
+                }
+                .typing-indicator span:nth-child(3) {
+                    animation: pulse 1s infinite 0.5s;
+                }
+                @keyframes pulse {
+                    0% { transform: scale(1); opacity: 0.4; }
+                    50% { transform: scale(1.2); opacity: 1; }
+                    100% { transform: scale(1); opacity: 0.4; }
+                }
+                
+                ::-webkit-scrollbar {
+                    width: 6px;
+                }
+                ::-webkit-scrollbar-track {
+                    background: rgba(3, 7, 18, 0.1);
+                    border-radius: 10px;
+                }
+                ::-webkit-scrollbar-thumb {
+                    background: rgba(16, 185, 129, 0.3);
+                    border-radius: 10px;
+                }
+                ::-webkit-scrollbar-thumb:hover {
+                    background: rgba(16, 185, 129, 0.5);
+                }
+                
+                .bg-gradient-radial {
+                    background-image: radial-gradient(var(--tw-gradient-stops));
+                }
+            `}</style>
         </div>
     );
 };

@@ -263,7 +263,8 @@ class LearningController {
                     isCorrect,
                     marksObtained,
                     responseTime: response.responseTime,
-                    feedback: isCorrect ? 'Correct!' : `Incorrect. ${question.aiGeneratedExplanation || 'Please review the topic.'}`
+                    feedback: isCorrect ? 'Correct!' : `Incorrect. ${question.aiGeneratedExplanation || 'Please review the topic.'}`,
+                    resources: []
                 };
             });
 
@@ -280,9 +281,20 @@ class LearningController {
                 'learning-path'
             );
 
+            // Attach resources to incorrect responses
+            quiz.responses = quiz.responses.map((response, index) => {
+                if (!response.isCorrect) {
+                    const feedback = performanceAnalysis.incorrectFeedback.find(f => f.question === response.question);
+                    if (feedback) {
+                        response.feedback = feedback.feedback;
+                        response.resources = feedback.resources;
+                    }
+                }
+                return response;
+            });
+
             quiz.strengths = performanceAnalysis.strengths;
             quiz.weaknesses = performanceAnalysis.weaknesses;
-            quiz.recommendedResources = JSON.stringify(performanceAnalysis.resources);
 
             await quiz.save();
 
@@ -296,33 +308,40 @@ class LearningController {
                     }
                 );
 
-                if (totalMarks / totalPossibleMarks < 0.7) {
-                    const remedialSubtopics = performanceAnalysis.remedialSubtopics;
-                    if (remedialSubtopics.length > 0) {
-                        const maxOrder = Math.max(...learningPath.topics.map(t => t.order));
-                        await LearningPath.updateOne(
-                            { _id: learningPath._id },
-                            {
-                                $push: {
-                                    topics: {
-                                        $each: remedialSubtopics.map((st, i) => ({
-                                            topicName: st.name,
-                                            topicDescription: st.description,
-                                            topicResourceLink: st.resourceLinks,
-                                            order: maxOrder + i + 1,
-                                            completionStatus: false,
-                                            completionDate: null
-                                        }))
-                                    }
+                // Update learning path with remedial subtopics only for incorrect answers
+                const incorrectSubtopics = [...new Set(
+                    quiz.responses
+                        .filter(r => !r.isCorrect)
+                        .map((_, i) => quiz.questions[i].subtopic)
+                )];
+                const remedialSubtopics = performanceAnalysis.remedialSubtopics
+                    .filter(st => incorrectSubtopics.includes(st.name));
+
+                if (remedialSubtopics.length > 0) {
+                    const maxOrder = Math.max(...learningPath.topics.map(t => t.order), 0);
+                    await LearningPath.updateOne(
+                        { _id: learningPath._id },
+                        {
+                            $push: {
+                                topics: {
+                                    $each: remedialSubtopics.map((st, i) => ({
+                                        topicName: st.name,
+                                        topicDescription: st.description,
+                                        topicResourceLink: st.resourceLinks,
+                                        timeSpent: 0,
+                                        order: maxOrder + i + 1,
+                                        completionStatus: false,
+                                        completionDate: null
+                                    }))
                                 }
                             }
-                        );
-                    }
+                        }
+                    );
                 }
 
                 const completedTopics = learningPath.topics.filter(t => t.completionStatus).length;
                 learningPath.courseCompletionStatus = Math.round((completedTopics / learningPath.topics.length) * 100);
-                if (learningPath.courseCompletionStatus === 100) {
+                if (learningPath.courseCompletionStatus === 100 && !learningPath.courseCompletionDate) {
                     learningPath.courseCompletionDate = new Date();
                     await User.findByIdAndUpdate(user._id, { $inc: { 'progressMetrics.completedCourses': 1 } });
                 }
