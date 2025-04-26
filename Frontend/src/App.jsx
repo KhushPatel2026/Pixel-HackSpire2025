@@ -9,6 +9,7 @@ import Chatbot from './Pages/Chatbot/Chatbot'
 import Logout from './Components/Logout'
 import Landing from './Pages/Landing/Landing'
 import QuizPage from './Pages/Quiz/Quiz'
+import DocumentChat from './Pages/Recognition/Recognition'
 
 function App() {
   const navigate = useNavigate();
@@ -34,6 +35,7 @@ function App() {
       <Routes>
         <Route path="/" element={<Landing />} />
         <Route path="/login" element={<Login />} />
+        <Route path="/document" element={<DocumentChat />} />
         <Route path="/quiz" element={<QuizPage />} />
         <Route path="/profile" element={<Profile />} />
         <Route path="/chatbot" element={<Chatbot />} />
