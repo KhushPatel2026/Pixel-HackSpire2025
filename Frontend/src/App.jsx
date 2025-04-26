@@ -31,7 +31,7 @@ function App() {
       <Logout />
       <Logout />
       <Routes>
-        <route path="/" element={<Landing />} />
+        <Route path="/" element={<Landing />} />
         <Route path="/login" element={<Login />} />
         <Route path="/profile" element={<Profile />} />
         <Route path="/chatbot" element={<Chatbot />} />

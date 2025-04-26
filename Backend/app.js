@@ -10,9 +10,11 @@ const socialAuthRoutes = require('./routes/socialAuthRoute');
 const learningRoutes = require('./Routes/learningRoutes');
 const passport = require('./utils/passportConfig');
 const session = require('express-session');
+const path = require('path')
 
 app.use(cors({ origin: 'http://localhost:5173', credentials: true }));
 app.use(express.static('public'));
+app.use('/audio', express.static(path.join(__dirname, 'public/audio')));
 app.use(express.json());
 app.use(cookieParser());
 

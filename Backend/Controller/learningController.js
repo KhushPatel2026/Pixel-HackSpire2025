@@ -12,7 +12,7 @@ class LearningController {
             return res.status(401).json({ status: 'error', error: 'No token provided' });
         }
         try {
-            const decoded = jwt.verify(token, process.env.JWT_SECRET);;
+            const decoded = jwt.verify(token, process.env.JWT_SECRET);
             const email = decoded.email;
             const user = await User.findOne({ email }).select('-password');
             if (!user) {
@@ -20,8 +20,8 @@ class LearningController {
             }
             return user;
         } catch (error) {
-            console.error('Token verification error:', error);
-            return res.status(401).json({ status: 'error', error: 'invalid token' });
+            console.error('Token verification error:', error.message);
+            return res.status(401).json({ status: 'error', error: 'Invalid token' });
         }
     }
 
@@ -39,6 +39,7 @@ class LearningController {
             const simplifiedContent = await aiService.generateSimplifiedContent(content, contentType);
             res.json({ status: 'ok', data: simplifiedContent });
         } catch (error) {
+            console.error('simplifyContent error:', error.message);
             res.status(500).json({ status: 'error', error: error.message || 'Failed to simplify content' });
         }
     }
@@ -82,6 +83,7 @@ class LearningController {
             await User.findByIdAndUpdate(user._id, { $inc: { 'progressMetrics.totalCourses': 1 } });
             res.json({ status: 'ok', data: learningPath });
         } catch (error) {
+            console.error('generateLearningPath error:', error.message);
             res.status(500).json({ status: 'error', error: error.message || 'Failed to generate learning path' });
         }
     }
@@ -92,29 +94,43 @@ class LearningController {
             const user = await this.verifyToken(token, res);
             if (res.headersSent) return;
 
-            const { question, type = 'text' } = req.body;
-            if (!question) {
-                return res.status(400).json({ status: 'error', error: 'Question is required' });
-            }
+            const { type = 'text' } = req.body;
             if (!['text', 'voice'].includes(type)) {
                 return res.status(400).json({ status: 'error', error: 'Type must be text or voice' });
             }
 
-            // Generate response using Gemini AI
-            const answer = await aiService.generateAIResponse(question);
-            let audioUrl = null;
-            let source = type;
+            let question;
+            let transcription = '';
 
             if (type === 'voice') {
-                // Generate voice reply
-                const outputFile = path.join('public/audio', `output-${Date.now()}.mp3`);
-                await aiService.synthesizeSpeech(answer, outputFile);
-                audioUrl = `http://localhost:3000/audio/${path.basename(outputFile)}`;
-                // Update answer to include audio URL
-                answer = `Voice reply generated. Access it at: ${audioUrl}`;
+                if (!req.file) {
+                    return res.status(400).json({ status: 'error', error: 'Audio file is required for voice input' });
+                }
+                console.log('Uploaded file:', { mimetype: req.file.mimetype, size: req.file.size });
+                try {
+                    transcription = await aiService.transcribeAudio(req.file.buffer, req.file.mimetype);
+                    question = transcription;
+                } catch (error) {
+                    console.error('Transcription failed:', error.message);
+                    return res.status(400).json({ status: 'error', error: `Transcription failed: ${error.message}` });
+                }
+            } else {
+                question = req.body.question;
+                if (!question) {
+                    return res.status(400).json({ status: 'error', error: 'Question is required for text input' });
+                }
             }
 
-            const chatbot = await Chatbot.findOneAndUpdate(
+            const chatbot = await Chatbot.findOne({ userId: user._id }).lean();
+            const chatHistory = chatbot?.chatHistory || [];
+
+            const { answer, followUp } = await aiService.generateAIResponse(question, chatHistory);
+
+            const outputFile = path.join('public/audio', `output-${Date.now()}.mp3`);
+            await aiService.synthesizeSpeech(answer, outputFile);
+            const audioUrl = `http://localhost:3000/audio/${path.basename(outputFile)}`;
+
+            const updatedChatbot = await Chatbot.findOneAndUpdate(
                 { userId: user._id },
                 {
                     $push: {
@@ -122,16 +138,27 @@ class LearningController {
                             question,
                             answer,
                             date: new Date(),
-                            source,
-                            audioUrl: type === 'voice' ? audioUrl : null
+                            source: type,
+                            audioUrl,
+                            followUp
                         }
                     }
                 },
                 { new: true, upsert: true }
             );
 
-            res.json({ status: 'ok', data: { answer, audioUrl, chatHistory: chatbot.chatHistory } });
+            res.json({ 
+                status: 'ok', 
+                data: { 
+                    transcription,
+                    answer, 
+                    audioUrl, 
+                    followUp, 
+                    chatHistory: updatedChatbot.chatHistory 
+                } 
+            });
         } catch (error) {
+            console.error('handleChat error:', error.message, error.stack);
             res.status(500).json({ status: 'error', error: error.message || 'Failed to process chat' });
         }
     }
@@ -174,6 +201,7 @@ class LearningController {
 
             res.json({ status: 'ok', data: quiz });
         } catch (error) {
+            console.error('generateQuiz error:', error.message);
             res.status(500).json({ status: 'error', error: error.message || 'Failed to generate quiz' });
         }
     }
@@ -242,6 +270,7 @@ class LearningController {
 
             res.json({ status: 'ok', data: { quiz, message: 'Quiz submitted successfully' } });
         } catch (error) {
+            console.error('submitQuiz error:', error.message);
             res.status(500).json({ status: 'error', error: error.message || 'Failed to submit quiz' });
         }
     }
@@ -269,6 +298,7 @@ class LearningController {
 
             res.json({ status: 'ok', data: progressData });
         } catch (error) {
+            console.error('getProgress error:', error.message);
             res.status(500).json({ status: 'error', error: error.message || 'Failed to fetch progress' });
         }
     }
@@ -309,6 +339,7 @@ class LearningController {
 
             res.json({ status: 'ok', data: dashboardData });
         } catch (error) {
+            console.error('getDashboardData error:', error.message);
             res.status(500).json({ status: 'error', error: error.message || 'Failed to fetch dashboard data' });
         }
     }
