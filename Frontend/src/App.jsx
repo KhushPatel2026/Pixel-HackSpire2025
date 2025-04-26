@@ -18,14 +18,14 @@ function App() {
 
   useEffect(() => {
     const urlParams = new URLSearchParams(location.search);
-    const tokenFromUrl = urlParams.get('token');
-    const tokenFromStorage = localStorage.getItem('token');
+    const tokenFromUrl = urlParams.get("token");
+    const tokenFromStorage = localStorage.getItem("token");
 
     if (tokenFromUrl) {
-      localStorage.setItem('token', tokenFromUrl);
-      navigate('/profile', { replace: true });
+      localStorage.setItem("token", tokenFromUrl);
+      navigate("/profile", { replace: true });
     } else if (!tokenFromStorage) {
-      navigate('/login', { replace: true });
+      navigate("/login", { replace: true });
     }
   }, [location, navigate]);
 
