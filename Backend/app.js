@@ -6,36 +6,34 @@ const mongoose = require('mongoose');
 const cookieParser = require('cookie-parser');
 const authRoutes = require('./routes/authRoutes');
 const profileRoutes = require('./routes/profileRoutes');
-const socialAuthRoutes = require('./Routes/socialAuthRoute')
-const MONGO_URL = process.env.MONGO_URL;
-const passport = require('./Utils/passportConfig');
+const socialAuthRoutes = require('./routes/socialAuthRoute');
+const learningRoutes = require('./Routes/learningRoutes');
+const passport = require('./utils/passportConfig');
 const session = require('express-session');
 
 app.use(cors({ origin: 'http://localhost:5173', credentials: true }));
+app.use(express.static('public'));
 app.use(express.json());
 app.use(cookieParser());
 
 app.use(session({
-  secret: process.env.JWT_SECRET,
-  resave: false,
-  saveUninitialized: true
+    secret: process.env.JWT_SECRET,
+    resave: false,
+    saveUninitialized: true
 }));
 
 app.use(passport.initialize());
 app.use(passport.session());
 
-mongoose.connect(MONGO_URL)
-  .then(() => {
-    console.log("MongoDB connection open");
-  })
-  .catch((err) => {
-    console.error("MongoDB connection error:", err);
-  });
+mongoose.connect(process.env.MONGO_URL)
+    .then(() => console.log("MongoDB connection open"))
+    .catch((err) => console.error("MongoDB connection error:", err));
 
 app.use('/api/auth', authRoutes);
-app.use('/api', profileRoutes);
+app.use('/api/profile', profileRoutes);
 app.use('/auth', socialAuthRoutes);
+app.use('/api/learning', learningRoutes);
 
 app.listen(3000, () => {
-  console.log('Server started on 3000');
+    console.log('Server started on 3000');
 });

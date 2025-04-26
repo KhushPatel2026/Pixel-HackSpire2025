@@ -1,29 +1,35 @@
 const mongoose = require('mongoose');
 
-const LearningPath = new mongoose.Schema({
-    userId: { type: String, required: true, ref: 'User' },
+const learningPathSchema = new mongoose.Schema({
+    userId: { type: mongoose.Schema.Types.ObjectId, required: true, ref: 'User' },
     courseName: { type: String, required: true },
     topics: [{
         topicName: { type: String, required: true },
         topicDescription: { type: String, required: true },
-        topicResourceLink: [{ type: String, required: true }],
+        topicResourceLink: [{ type: String }],
         completionStatus: { type: Boolean, default: false },
-        timeSpent: { type: String, required: true },
-        completionDate: { type: Date, default: null },
+        timeSpent: { type: Number, default: 0 }, // Changed to Number for easier calculations
+        completionDate: { type: Date },
+        aiGeneratedSummary: { type: String }
     }],
     courseCompletionStatus: { type: Number, default: 0 },
     currentStep: { type: Number, default: 0 },
-    courseCompletionDate: { type: Date, default: null },
-    courseStrength: { type: String, required: true },
-    courseWeakness: { type: String, required: true },
-    courseScore: { type: Number, required: true, default: 0 },
-    courseResult: { type: String, required: true },
-    courseDuration: { type: String, required: true },
+    courseCompletionDate: { type: Date },
+    courseStrength: { type: String },
+    courseWeakness: { type: String },
+    courseScore: { type: Number, default: 0 },
+    courseResult: { type: String, default: 'In Progress' },
+    courseDuration: { type: Number }, // Changed to Number (in hours)
     quizzes: [{
-        quizId: { type: String, required: true, ref: 'Quiz' },
+        quizId: { type: mongoose.Schema.Types.ObjectId, ref: 'Quiz' },
+        completed: { type: Boolean, default: false }
     }],
     difficultyLevel: { type: String, required: true, enum: ['Easy', 'Medium', 'Hard'] },
+    gamification: {
+        badges: [{ type: String }],
+        streak: { type: Number, default: 0 },
+        points: { type: Number, default: 0 }
+    }
 });
 
-const model = mongoose.model('LearningPath', LearningPath);
-module.exports = model;
+module.exports = mongoose.model('LearningPath', learningPathSchema);

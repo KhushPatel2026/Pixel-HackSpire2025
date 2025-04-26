@@ -1,33 +1,33 @@
-const mongose = require('mongoose')
+const mongoose = require('mongoose');
 
-const quiz = new mongose.Schema({
-    userId: { type: String, required: true, ref: 'User' },
+const quizSchema = new mongoose.Schema({
+    userId: { type: mongoose.Schema.Types.ObjectId, required: true, ref: 'User' },
     topicName: { type: String, required: true },
-    quizTime: { type: String, required: true },
-    completedTime: { type: String, required: true },
-    quizDate: { type: String, required: true },
+    quizTime: { type: Number, required: true }, // Duration in minutes
+    completedTime: { type: Date },
+    quizDate: { type: Date, default: Date.now },
     questions: [{
         question: { type: String, required: true },
-        options: [{ type: String, required: true }],
+        options: [{ type: String }],
         correctAnswer: { type: String, required: true },
         questionType: { type: String, required: true, enum: ['MCQ', 'True/False', 'Short Answer'] },
         marks: { type: Number, required: true },
+        aiGeneratedExplanation: { type: String }
     }],
     responses: [{
         question: { type: String, required: true },
-        selectedOption: { type: String, required: true },
-        isCorrect: { type: Boolean, required: true },
-        marksObtained: { type: Number, required: true },
+        selectedOption: { type: String },
+        isCorrect: { type: Boolean },
+        marksObtained: { type: Number },
         questionType: { type: String, required: true, enum: ['MCQ', 'True/False', 'Short Answer'] },
-        ResponseTime: { type: String, required: true },
-        feedback: { type: String, required: true },
+        responseTime: { type: Number }, // Time in seconds
+        feedback: { type: String }
     }],
-    quizResult: { type: String, required: true },
-    quizScore: { type: String, required: true },
-    strength: { type: String, required: true },
-    weakness: { type: String, required: true },
-    difficultyLevel: { type: String, required: true, enum: ['Easy', 'Medium', 'Hard'] },
+    quizResult: { type: String, default: 'Pending' },
+    quizScore: { type: Number, default: 0 },
+    strength: { type: String },
+    weakness: { type: String },
+    difficultyLevel: { type: String, required: true, enum: ['Easy', 'Medium', 'Hard'] }
 });
 
-const model = mongose.model('Quiz', quiz)
-module.exports = model
+module.exports = mongoose.model('Quiz', quizSchema);

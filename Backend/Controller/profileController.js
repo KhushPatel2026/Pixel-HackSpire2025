@@ -1,4 +1,3 @@
-// profileController.js
 const User = require('../Model/User');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
