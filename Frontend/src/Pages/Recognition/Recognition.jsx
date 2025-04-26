@@ -39,6 +39,7 @@ export default function DocumentChat() {
       setLoading(true);
       setError(null);
       setUploadStatus(null);
+      setResponse(null); // Clear any previous response
 
       const res = await axios.post(`${API_BASE_URL}/upload`, formData, {
         headers: {
@@ -46,7 +47,9 @@ export default function DocumentChat() {
         },
       });
 
-      setUploadStatus(`File processed successfully! ${res.data.chunks_processed} chunks created.`);
+      // Set the upload status and display the summary
+      setUploadStatus(`File processed successfully! ${res.data.page_count} pages processed.`);
+      setResponse(res.data.summary); // Display the summary immediately after upload
     } catch (err) {
       console.error('Upload Error:', err);
       setError(err.response?.data?.error || 'Failed to upload file. Please try again.');
@@ -203,19 +206,9 @@ export default function DocumentChat() {
         {response && (
           <div className="mt-6 p-6 bg-[#0a1a0a]/80 backdrop-blur-sm rounded-2xl border border-green-500/20">
             <h2 className="text-xl font-bold mb-2 bg-clip-text text-transparent bg-gradient-to-r from-green-400 to-emerald-400">
-              Answer
+              Document Summary
             </h2>
-            <p className="text-gray-300 mb-4">{response}</p>
-            {sources.length > 0 && (
-              <>
-                <h3 className="text-lg font-semibold mb-2 text-white">Sources:</h3>
-                <ul className="list-disc pl-6 space-y-2">
-                  {sources.map((source, index) => (
-                    <li key={index} className="text-gray-400">{source}</li>
-                  ))}
-                </ul>
-              </>
-            )}
+            <p className="text-gray-300 mb-4 whitespace-pre-line">{response}</p>
           </div>
         )}
       </main>
