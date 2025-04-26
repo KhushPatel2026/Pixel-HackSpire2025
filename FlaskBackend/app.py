@@ -33,7 +33,96 @@ generation_config = {
     'max_output_tokens': 2048,
 }
 model = genai.GenerativeModel('gemini-2.0-flash', generation_config=generation_config)
-print("Gemini model configured with generation parameters")
+
+# Initialize embedding model
+print("Configuring embedding model...")
+embedding_model = genai.GenerativeModel('embedding-001')
+
+def get_embedding(text):
+    """Get embedding for a text using Gemini directly"""
+    try:
+        response = genai.embed_content(
+            model='models/embedding-001',
+            content=text,
+            task_type='retrieval_query'
+        )
+        return response['embedding']
+    except Exception as e:
+        print(f"Error generating embedding: {str(e)}")
+        raise
+
+def batch_get_embeddings(texts, batch_size=20):
+    """Get embeddings for multiple texts in batches"""
+    all_embeddings = []
+    for i in range(0, len(texts), batch_size):
+        batch = texts[i:i + batch_size]
+        batch_embeddings = []
+        for text in batch:
+            try:
+                response = genai.embed_content(
+                    model='models/embedding-001',
+                    content=text,
+                    task_type='retrieval_document'
+                )
+                batch_embeddings.append(response['embedding'])
+            except Exception as e:
+                print(f"Error in batch embedding: {str(e)}")
+                raise
+        all_embeddings.extend(batch_embeddings)
+        print(f"Processed batch {i//batch_size + 1} of {(len(texts) + batch_size - 1)//batch_size}")
+    return all_embeddings
+
+# Initialize Pinecone with new client
+print("Initializing Pinecone...")
+pc = Pinecone(api_key=PINECONE_API_KEY)
+
+# Create or get the index
+DIMENSION = 768  # dimension for embedding model
+DEFAULT_NAMESPACE = "default"  # Add default namespace
+
+try:
+    # Try to get existing index
+    print(f"Checking for existing index: {PINECONE_INDEX_NAME}")
+    existing_indexes = pc.list_indexes().names()
+    
+    if PINECONE_INDEX_NAME not in existing_indexes:
+        print(f"Creating new Pinecone index: {PINECONE_INDEX_NAME}")
+        pc.create_index(
+            name=PINECONE_INDEX_NAME,
+            dimension=DIMENSION,
+            metric='cosine',
+            spec=ServerlessSpec(
+                cloud='aws',
+                region='us-west-2'
+            )
+        )
+        # Wait for index to be ready
+        print("Waiting for index to be ready...")
+        time.sleep(20)  # Give more time for index creation
+    
+    # Connect to the index
+    index = pc.Index(PINECONE_INDEX_NAME)
+    
+    # Test the connection with a simple operation
+    try:
+        stats = index.describe_index_stats()
+        print(f"Successfully connected to index. Stats: {stats}")
+    except Exception as e:
+        print(f"Error testing index connection: {str(e)}")
+        raise
+        
+except Exception as e:
+    print(f"Error initializing Pinecone: {str(e)}")
+    raise
+
+print("Pinecone index ready")
+
+# Initialize text splitter
+text_splitter = RecursiveCharacterTextSplitter(
+    chunk_size=1000,
+    chunk_overlap=200,
+    length_function=len,
+)
 
 UPLOAD_FOLDER = 'uploads'
 if not os.path.exists(UPLOAD_FOLDER):
@@ -54,37 +143,164 @@ def process_pdf(file_path):
     print(f"PDF text extracted successfully. Total pages: {len(pdf_reader.pages)}")
     print(f"Extracted text length: {len(text)} characters")
     
-    # Prepare the prompt for summarization
-    prompt = f"""Please provide a comprehensive summary of the following document. Include:
-1. Main topics and key points
-2. Important findings or conclusions
-3. Any significant data or statistics
-4. Key recommendations (if any)
-
-Document text:
-{text}
-
-Please structure the summary in a clear, organized manner."""
+    # Split text into chunks
+    chunks = text_splitter.split_text(text)
+    print(f"Split into {len(chunks)} chunks")
+    
+    # Create embeddings in batches
+    print("Generating embeddings...")
+    chunk_embeddings = batch_get_embeddings(chunks)
+    print(f"Generated embeddings for {len(chunk_embeddings)} chunks")
     
     try:
-        print("Sending request to Gemini API...")
-        # Get summary from Gemini
+        # Prepare vectors for Pinecone
+        vectors = []
+        for i, (chunk, embedding) in enumerate(zip(chunks, chunk_embeddings)):
+            vectors.append({
+                'id': f'chunk_{i}',
+                'values': embedding,
+                'metadata': {
+                    'text': chunk,
+                    'page': i // len(pdf_reader.pages)
+                }
+            })
+        
+        # Clear existing vectors (if any) and upsert new ones
+        print("Clearing existing vectors...")
+        try:
+            # First, try to get stats to ensure the namespace exists
+            stats = index.describe_index_stats()
+            print(f"Current index stats: {stats}")
+            
+            # Then proceed with delete
+            index.delete(
+                delete_all=True,
+                namespace=DEFAULT_NAMESPACE
+            )
+        except Exception as e:
+            print(f"Warning during vector cleanup: {str(e)}")
+            # Continue even if delete fails (namespace might not exist yet)
+        
+        # Upsert in batches of 100
+        print("Upserting new vectors...")
+        batch_size = 100
+        for i in range(0, len(vectors), batch_size):
+            batch = vectors[i:i + batch_size]
+            try:
+                index.upsert(
+                    vectors=batch,
+                    namespace=DEFAULT_NAMESPACE
+                )
+                print(f"Uploaded batch {i//batch_size + 1} of {(len(vectors) + batch_size - 1)//batch_size}")
+            except Exception as e:
+                print(f"Error upserting batch: {str(e)}")
+                raise
+        
+        print("Vectors uploaded to Pinecone successfully")
+        
+    except Exception as e:
+        print(f"Error during vector operations: {str(e)}")
+        raise
+    
+    # Generate initial summary
+    summary_prompt = f"""Please provide a comprehensive summary of the following document. Format your response using these rules:
+1. Use ** ** for bold text (e.g., **Important Topic**)
+2. Use single * at the start of a line for bullet points
+3. Use clear section headers in bold (e.g., **1. Main Topics and Key Points:**)
+4. Organize the content with proper spacing between sections
+
+Include:
+**1. Main Topics and Key Points:**
+* Key topics and main ideas
+* Important concepts discussed
+* Core arguments or themes
+
+**2. Important Findings or Conclusions:**
+* Major findings
+* Key conclusions
+* Significant results
+
+**3. Significant Data or Statistics:**
+* Notable numbers or percentages
+* Important measurements
+* Key metrics
+
+**4. Key Recommendations:**
+* Main suggestions
+* Action items
+* Future directions
+
+Document text:
+{text[:5000]}  # Using first 5000 chars for summary"""
+    
+    response = model.generate_content(summary_prompt)
+    
+    return {
+        'summary': response.text,
+        'page_count': len(pdf_reader.pages),
+        'chunk_count': len(chunks)
+    }
+
+def get_relevant_chunks(query, top_k=3):
+    """Retrieve most relevant chunks for a query from Pinecone"""
+    try:
+        # Get query embedding
+        query_embedding = get_embedding(query)
+        
+        # Search in Pinecone
+        results = index.query(
+            vector=query_embedding,
+            top_k=top_k,
+            include_metadata=True,
+            namespace=DEFAULT_NAMESPACE
+        )
+        
+        # Extract chunks from results
+        chunks = [match.metadata['text'] for match in results.matches]
+        
+        # Prepare context and generate response
+        context = "\n\n".join(chunks)
+        
+        prompt = f"""Based on the following context, please answer the question. Format your response using these rules:
+1. Use ** ** for bold text (e.g., **Important Point**)
+2. Use single * at the start of a line for bullet points
+3. If listing multiple items, use bullet points
+4. If the answer cannot be found in the context, say "I cannot find information about this in the document."
+
+Context:
+{context}
+
+Question: {query}
+
+Answer:"""
+        
+        # Generate response
         response = model.generate_content(prompt)
         
-        # Debug response object
-        print(f"Response received. Response type: {type(response)}")
+        return chunks, response.text
         
-        if response.text:
-            print("Summary generated successfully")
-            print(f"Summary length: {len(response.text)} characters")
-            return {
-                'summary': response.text,
-                'page_count': len(pdf_reader.pages)
-            }
-        else:
-            print("Error: Empty response text from Gemini")
-            raise Exception("Empty response from Gemini")
-            
+    except Exception as e:
+        print(f"Error retrieving chunks: {str(e)}")
+        raise
+
+@app.route('/chat', methods=['POST'])
+def chat():
+    try:
+        data = request.json
+        if not data or 'question' not in data:
+            return jsonify({'error': 'No question provided'}), 400
+        
+        question = data['question']
+        print(f"Received question: {question}")
+        
+        # Get relevant chunks and generate response
+        chunks, answer = get_relevant_chunks(question)
+        
+        return jsonify({
+            'answer': answer,
+            'context': chunks  # Optional: return context for debugging
+        }), 200
+        
     except Exception as e:
         print(f"Error during Gemini API call: {str(e)}")
         print(f"Full error details: {repr(e)}")
