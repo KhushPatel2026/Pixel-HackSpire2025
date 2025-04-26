@@ -6,7 +6,6 @@ from pypdf import PdfReader
 from langchain_openai import OpenAIEmbeddings
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from pinecone import Pinecone
-from langchain_google_genai import ChatGoogleGenerativeAI
 import google.generativeai as genai
 import json
 
@@ -20,7 +19,7 @@ GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
 
 # Initialize Gemini
 genai.configure(api_key=GEMINI_API_KEY)
-llm = ChatGoogleGenerativeAI(model="gemini-pro", temperature=0.7)
+model = genai.GenerativeModel('gemini-pro')
 
 # Initialize Pinecone with new API
 pc = Pinecone(api_key=PINECONE_API_KEY)
@@ -131,10 +130,10 @@ Question: {question}
 Answer:"""
     
     # Get response from Gemini
-    response = llm.invoke(prompt)
+    response = model.generate_content(prompt)
     
     return jsonify({
-        'answer': response.content,
+        'answer': response.text,
         'sources': [match['metadata']['source'] for match in search_results['matches']]
     })
 
