@@ -1,4 +1,5 @@
 const { GoogleGenerativeAI } = require('@google/generative-ai');
+const fetch = require('node-fetch'); // Added for URL validation
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
@@ -12,24 +13,39 @@ const cleanJsonResponse = (rawText) => {
 
 const parseJsonSafely = (text, fallback, errorMessage) => {
     try {
-        const parsed = JSON.parse(text);
-        return parsed;
+        return JSON.parse(text);
     } catch (error) {
         console.error(errorMessage, error);
         return fallback;
     }
 };
 
+const isValidUrl = async (url) => {
+    try {
+        const response = await fetch(url, { method: 'HEAD', timeout: 5000 });
+        return response.ok && (url.startsWith('https://') || url.startsWith('http://'));
+    } catch {
+        return false;
+    }
+};
+
 const generateAdaptivePath = async (userId, courseName, difficultyLevel, preferences) => {
     try {
         const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
-        const prompt = `Generate a personalized learning path for user ${userId} for the course "${courseName}" with difficulty "${difficultyLevel}". Consider preferences: ${JSON.stringify(preferences)}. Return a JSON object with topics (array of objects with name, description, resourceLinks), strength (string), weakness (string), and duration (number in hours). Example format:
+        const prompt = `
+Generate a personalized learning path for user ${userId} for the course "${courseName}" at ${difficultyLevel} difficulty. Focus strictly on the core concepts of "${courseName}", avoiding loosely related or tangential topics. Break it into 6-8 subtopics, each designed to teach the user from 0 to 100 in that subtopic. For each subtopic, provide:
+- name: Subtopic name
+- description: Brief description (1-2 sentences) of the core subtopic
+- resourceLinks: Array of 2-3 highly relevant, existent resources (e.g., YouTube videos, official documentation) with title and URL, strictly related to the subtopic and verified to exist
+Consider preferences: ${JSON.stringify(preferences)}. Ensure all resource URLs are valid, accessible, and directly address the subtopic. Return a JSON object with topics, strength, weakness, and duration (in hours). Example:
 {
   "topics": [
     {
-      "name": "Topic Name",
-      "description": "Topic Description",
-      "resourceLinks": ["url1", "url2"]
+      "name": "Subtopic Name",
+      "description": "Description",
+      "resourceLinks": [
+        { "title": "Resource Title", "url": "https://example.com" }
+      ]
     }
   ],
   "strength": "Strength description",
@@ -42,28 +58,96 @@ const generateAdaptivePath = async (userId, courseName, difficultyLevel, prefere
 
         const cleanedText = cleanJsonResponse(rawText);
         const fallback = {
-            topics: [],
+            topics: [
+                {
+                    name: `${courseName} Basics`,
+                    description: `Introduction to core concepts of ${courseName}.`,
+                    resourceLinks: []
+                }
+            ],
             strength: 'Unknown',
             weakness: 'Unknown',
             duration: 10
         };
-
         const parsed = parseJsonSafely(cleanedText, fallback, 'Failed to parse adaptive path JSON');
-        
+
         if (!Array.isArray(parsed.topics) || typeof parsed.strength !== 'string' || typeof parsed.weakness !== 'string' || typeof parsed.duration !== 'number') {
             return fallback;
         }
 
+        // Validate and filter resources
+        const fallbackResources = {
+            'Mathematics': [
+                { title: 'Khan Academy Algebra', url: 'https://www.khanacademy.org/math/algebra' },
+                { title: '3Blue1Brown Linear Algebra', url: 'https://www.youtube.com/playlist?list=PLZHQObOWTQDPD3MizzM2xVFitgF8hE_ab' }
+            ],
+            'Science': [
+                { title: 'Crash Course Physics', url: 'https://www.youtube.com/playlist?list=PL8dPuuaLjXtN0ge7yDk_UA0ldZJdhwkoV' },
+                { title: 'SciShow', url: 'https://www.youtube.com/@scishow' }
+            ],
+            'Programming': [
+                { title: 'MDN Web Docs JavaScript', url: 'https://developer.mozilla.org/en-US/docs/Web/JavaScript' },
+                { title: 'freeCodeCamp JavaScript Tutorial', url: 'https://www.youtube.com/watch?v=PkZNo7MFNFg' }
+            ],
+            'History': [
+                { title: 'History.com', url: 'https://www.history.com' },
+                { title: 'Crash Course World History', url: 'https://www.youtube.com/playlist?list=PLBDA2E52FB1EF80C9' }
+            ],
+            'Literature': [
+                { title: 'SparkNotes', url: 'https://www.sparknotes.com' },
+                { title: 'Thug Notes YouTube', url: 'https://www.youtube.com/@WisecrackEDU' }
+            ]
+        };
+
+        parsed.topics = await Promise.all(parsed.topics.map(async (topic, index) => {
+            let resourceLinks = Array.isArray(topic.resourceLinks)
+                ? await Promise.all(topic.resourceLinks.map(async (r) => (await isValidUrl(r.url) ? r : null)).filter(Boolean))
+                : [];
+            
+            if (resourceLinks.length < 2 && fallbackResources[courseName]) {
+                resourceLinks = fallbackResources[courseName].slice(0, 3 - resourceLinks.length);
+            }
+
+            return {
+                name: topic.name || `Subtopic ${index + 1}`,
+                description: topic.description || `Learn core aspects of ${topic.name || 'this topic'}.`,
+                resourceLinks,
+                order: index + 1
+            };
+        }));
+
         return parsed;
     } catch (error) {
-        throw new Error(`Failed to generate adaptive path: ${error.message}`);
+        console.error('generateAdaptivePath error:', error.message);
+        return {
+            topics: [
+                {
+                    name: `${courseName} Basics`,
+                    description: `Introduction to core concepts of ${courseName}.`,
+                    resourceLinks: [],
+                    order: 1
+                }
+            ],
+            strength: 'Unknown',
+            weakness: 'Unknown',
+            duration: 10
+        };
     }
 };
 
 const generateSmartQuiz = async (topicName, difficultyLevel, numQuestions, quizType) => {
     try {
         const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
-        const prompt = `Generate a ${quizType} quiz for the topic "${topicName}" with ${numQuestions} MCQ questions at ${difficultyLevel} difficulty. Each question must have exactly 4 options, one correct answer (matching one of the options), questionType set to "MCQ", marks (1 for Easy, 2 for Medium, 3 for Hard), and an aiGeneratedExplanation. Include duration (1 minute per question). Return a JSON object with questions and duration. Example format:
+        const prompt = `
+Generate a ${quizType} quiz for the topic "${topicName}" with ${numQuestions} MCQ questions at ${difficultyLevel} difficulty. Focus strictly on the core concepts of "${topicName}", avoiding loosely related or tangential topics. Each question must include:
+- question: Question text directly related to the core topic
+- options: Exactly 4 options
+- correctAnswer: One of the options
+- questionType: "MCQ"
+- marks: 1 for Easy, 2 for Medium, 3 for Hard
+- aiGeneratedExplanation: Explanation for the correct answer, focusing on the core concept
+- subtopic: The specific subtopic within "${topicName}" (e.g., for Programming: "Variables", "Functions")
+Include duration (1 minute per question). Return a JSON object with questions and duration. Example:
 {
   "questions": [
     {
@@ -72,7 +156,8 @@ const generateSmartQuiz = async (topicName, difficultyLevel, numQuestions, quizT
       "correctAnswer": "Option 1",
       "questionType": "MCQ",
       "marks": 2,
-      "aiGeneratedExplanation": "Explanation text"
+      "aiGeneratedExplanation": "Explanation text",
+      "subtopic": "Subtopic Name"
     }
   ],
   "duration": 5
@@ -83,10 +168,19 @@ const generateSmartQuiz = async (topicName, difficultyLevel, numQuestions, quizT
 
         const cleanedText = cleanJsonResponse(rawText);
         const fallback = {
-            questions: [],
+            questions: [
+                {
+                    question: `What is a core concept in ${topicName}?`,
+                    options: ['Option 1', 'Option 2', 'Option 3', 'Option 4'],
+                    correctAnswer: 'Option 1',
+                    questionType: 'MCQ',
+                    marks: difficultyLevel === 'Easy' ? 1 : difficultyLevel === 'Medium' ? 2 : 3,
+                    aiGeneratedExplanation: `This is a core concept in ${topicName}.`,
+                    subtopic: `${topicName} Basics`
+                }
+            ],
             duration: numQuestions
         };
-
         const parsed = parseJsonSafely(cleanedText, fallback, 'Failed to parse quiz JSON');
 
         if (!Array.isArray(parsed.questions) || typeof parsed.duration !== 'number') {
@@ -102,16 +196,35 @@ const generateSmartQuiz = async (topicName, difficultyLevel, numQuestions, quizT
                 !question.options.includes(question.correctAnswer) ||
                 question.questionType !== 'MCQ' ||
                 typeof question.marks !== 'number' ||
-                typeof question.aiGeneratedExplanation !== 'string'
+                typeof question.aiGeneratedExplanation !== 'string' ||
+                typeof question.subtopic !== 'string'
             ) {
                 return false;
             }
             return true;
         });
 
+        if (parsed.questions.length === 0) {
+            return fallback;
+        }
+
         return parsed;
     } catch (error) {
-        throw new Error(`Failed to generate quiz: ${error.message}`);
+        console.error('generateSmartQuiz error:', error.message);
+        return {
+            questions: [
+                {
+                    question: `What is a core concept in ${topicName}?`,
+                    options: ['Option 1', 'Option 2', 'Option 3', 'Option 4'],
+                    correctAnswer: 'Option 1',
+                    questionType: 'MCQ',
+                    marks: difficultyLevel === 'Easy' ? 1 : difficultyLevel === 'Medium' ? 2 : 3,
+                    aiGeneratedExplanation: `This is a core concept in ${topicName}.`,
+                    subtopic: `${topicName} Basics`
+                }
+            ],
+            duration: numQuestions
+        };
     }
 };
 
@@ -119,20 +232,20 @@ const analyzeQuizPerformance = async (topicName, difficultyLevel, responses, que
     try {
         const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
         const prompt = `
-Analyze the quiz performance for the topic "${topicName}" at ${difficultyLevel} difficulty. Below are the responses and questions:
+Analyze the quiz performance for the topic "${topicName}" at ${difficultyLevel} difficulty. Focus strictly on the core concepts of "${topicName}", avoiding loosely related or tangential topics. Below are the responses and questions:
 
 Responses: ${JSON.stringify(responses)}
 Questions: ${JSON.stringify(questions)}
 
-Generate strengths, weaknesses, and recommended resources. Return a JSON object with:
-- strengths: A string describing areas where the user performed well (e.g., based on correct answers, especially high-mark questions).
-- weaknesses: A string describing areas where the user struggled (e.g., based on incorrect answers, patterns in mistakes).
-- resources: An array of objects with title and url for recommended learning resources (YouTube videos, documentation) tailored to the weaknesses and topic make sure there are highly accurate and according to the weaknesses only and the page must exist.
+Generate:
+- strengths: A string describing areas where the user performed well (e.g., based on correct answers in core subtopics, especially high-mark questions).
+- weaknesses: A string describing areas where the user struggled (e.g., based on incorrect answers in core subtopics, patterns in mistakes).
+- resources: An array of 2-4 highly relevant, existent resources (e.g., YouTube videos, official documentation) with title and URL, strictly tailored to the weak subtopics and verified to exist.
 
-Example format:
+Example:
 {
-  "strengths": "You excelled in [specific area] by correctly answering high-difficulty questions.",
-  "weaknesses": "You struggled with [specific area], particularly in [subtopic].",
+  "strengths": "You excelled in [specific core subtopic] by correctly answering high-difficulty questions.",
+  "weaknesses": "You struggled with [specific core subtopic], particularly in [aspect].",
   "resources": [
     { "title": "Resource Title", "url": "https://example.com" },
     { "title": "YouTube Tutorial", "url": "https://youtube.com/watch?v=example" }
@@ -148,7 +261,6 @@ Example format:
             weaknesses: 'No specific weaknesses identified.',
             resources: []
         };
-
         const parsed = parseJsonSafely(cleanedText, fallback, 'Failed to parse performance analysis JSON');
 
         if (
@@ -160,11 +272,19 @@ Example format:
             return fallback;
         }
 
+        // Validate resources
+        parsed.resources = await Promise.all(
+            parsed.resources
+                .filter(r => r.title && r.url)
+                .map(async (r) => (await isValidUrl(r.url) ? r : null))
+                .filter(Boolean)
+        ).then(res => res.slice(0, 4));
+
         // Fallback resources for common topics
         const fallbackResources = {
             'Mathematics': [
                 { title: 'Khan Academy Algebra', url: 'https://www.khanacademy.org/math/algebra' },
-                { title: 'Math Antics YouTube', url: 'https://www.youtube.com/@Mathantics' }
+                { title: '3Blue1Brown Linear Algebra', url: 'https://www.youtube.com/playlist?list=PLZHQObOWTQDPD3MizzM2xVFitgF8hE_ab' }
             ],
             'Science': [
                 { title: 'Crash Course Physics', url: 'https://www.youtube.com/playlist?list=PL8dPuuaLjXtN0ge7yDk_UA0ldZJdhwkoV' },
@@ -185,7 +305,7 @@ Example format:
         };
 
         if (parsed.resources.length === 0 && fallbackResources[topicName]) {
-            parsed.resources = fallbackResources[topicName];
+            parsed.resources = fallbackResources[topicName].slice(0, 4);
         }
 
         return parsed;

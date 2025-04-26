@@ -134,16 +134,6 @@ export default function QuizCore({
     );
   };
 
-  let recommendedResources = [];
-  try {
-    // Fix typo: reccommendedResources -> recommendedResources
-    recommendedResources = result?.quiz?.recommendedResources
-      ? JSON.parse(result.quiz.recommendedResources)
-      : [];
-  } catch (error) {
-    console.error('Failed to parse recommended resources:', error);
-  }
-
   return (
     <>
       {error && (
@@ -283,7 +273,28 @@ export default function QuizCore({
                       <strong className={resp.isCorrect ? 'text-green-400' : 'text-red-400'}>
                         Question {index + 1}:
                       </strong>{' '}
-                      <span className="text-gray-300">{resp.feedback || 'No feedback available.'}</span>
+                      <span className="text-gray-300">{resp.question}</span>
+                      <p className="text-gray-300 mt-1">{resp.feedback || 'No feedback available.'}</p>
+                      {!resp.isCorrect && resp.resources?.length > 0 && (
+                        <div className="mt-2">
+                          <p className="text-green-400 font-medium">Recommended Resources:</p>
+                          <ul className="space-y-1 mt-1">
+                            {resp.resources.map((resource, rIdx) => (
+                              <li key={rIdx}>
+                                <a
+                                  href={resource.url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-green-400 hover:underline flex items-center gap-2"
+                                >
+                                  <Link className="h-4 w-4" />
+                                  {resource.title}
+                                </a>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
                     </motion.li>
                   )) || (
                     <li className="text-gray-400">No feedback available.</li>
@@ -305,38 +316,6 @@ export default function QuizCore({
                   Weaknesses:
                 </h3>
                 <p className="text-gray-300">{result.quiz?.weaknesses || 'No specific weaknesses identified.'}</p>
-              </div>
-
-              <div>
-                <h3 className="text-lg font-semibold mb-4 flex items-center gap-2 text-green-400">
-                  <Link className="h-5 w-5" />
-                  Recommended Resources:
-                </h3>
-                {recommendedResources.length > 0 ? (
-                  <ul className="space-y-3">
-                    {recommendedResources.map((resource, index) => (
-                      <motion.li
-                        key={index}
-                        initial={{ opacity: 0, x: -10 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ duration: 0.3, delay: 0.1 * index }}
-                        className="p-3 rounded-lg bg-[#0d1f0d]/50 border border-green-600/30"
-                      >
-                        <a
-                          href={resource.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-green-400 hover:underline flex items-center gap-2"
-                        >
-                          <Link className="h-4 w-4" />
-                          {resource.title}
-                        </a>
-                      </motion.li>
-                    ))}
-                  </ul>
-                ) : (
-                  <p className="text-gray-400">No recommended resources available.</p>
-                )}
               </div>
             </div>
           </div>

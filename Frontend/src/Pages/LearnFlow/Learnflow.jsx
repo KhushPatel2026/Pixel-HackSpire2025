@@ -16,7 +16,7 @@ export default function LearnFlow() {
   const [responses, setResponses] = useState([]);
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [isQuizLoading, setIsQuizLoading] = useState(false); // New state for quiz loading
+  const [isQuizLoading, setIsQuizLoading] = useState(false);
   const [error, setError] = useState('');
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [showQuestionSelector, setShowQuestionSelector] = useState(false);
@@ -100,7 +100,7 @@ export default function LearnFlow() {
   };
 
   const triggerQuiz = async (subtopicNames) => {
-    setIsQuizLoading(true); // Set quiz-specific loading state
+    setIsQuizLoading(true);
     try {
       const res = await axios.post(
         'http://localhost:3000/api/learning/trigger-quiz',
@@ -117,7 +117,7 @@ export default function LearnFlow() {
       setError(errorMessage);
       notifyError(errorMessage);
     } finally {
-      setIsQuizLoading(false); // Reset quiz loading state
+      setIsQuizLoading(false);
     }
   };
 
@@ -262,7 +262,7 @@ export default function LearnFlow() {
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
                   onClick={markSubtopicComplete}
-                  disabled={loading || isQuizLoading} // Disable during loading or quiz loading
+                  disabled={loading || isQuizLoading}
                   className={`mt-4 px-4 py-2 rounded-lg flex items-center gap-2 ${
                     loading || isQuizLoading
                       ? 'opacity-50 cursor-not-allowed'
