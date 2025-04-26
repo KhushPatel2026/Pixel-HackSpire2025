@@ -225,9 +225,7 @@ Document text:
 {text[:5000]}  # Using first 5000 chars for summary
 
 Please structure the summary in a clear, organized manner."""
-    
     response = model.generate_content(summary_prompt)
-    
     return {
         'summary': response.text,
         'page_count': len(pdf_reader.pages),
