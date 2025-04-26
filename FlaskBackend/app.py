@@ -6,16 +6,21 @@ from pypdf import PdfReader
 from langchain_openai import OpenAIEmbeddings
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from pinecone import Pinecone
-from langchain_openai import ChatOpenAI
+from langchain_google_genai import ChatGoogleGenerativeAI
+import google.generativeai as genai
 import json
 
 app = Flask(__name__)
 load_dotenv()
 
-# Configure OpenAI and Pinecone
+# Configure API keys
 OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
 PINECONE_API_KEY = os.getenv('PINECONE_API_KEY')
-PINECONE_ENVIRONMENT = os.getenv('PINECONE_ENVIRONMENT')
+GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
+
+# Initialize Gemini
+genai.configure(api_key=GEMINI_API_KEY)
+llm = ChatGoogleGenerativeAI(model="gemini-pro", temperature=0.7)
 
 # Initialize Pinecone with new API
 pc = Pinecone(api_key=PINECONE_API_KEY)
@@ -31,9 +36,8 @@ if index_name not in pc.list_indexes().names():
 
 index = pc.Index(index_name)
 
-# Initialize OpenAI embeddings
+# Initialize OpenAI embeddings (still using OpenAI for embeddings as they're very reliable)
 embeddings = OpenAIEmbeddings()
-llm = ChatOpenAI(temperature=0.7)
 
 UPLOAD_FOLDER = 'uploads'
 if not os.path.exists(UPLOAD_FOLDER):
@@ -115,16 +119,18 @@ def chat():
     contexts = [match['metadata']['text'] for match in search_results['matches']]
     
     # Prepare prompt
-    prompt = f"""Based on the following contexts, answer the question. If the answer cannot be found in the contexts, say "I cannot find the answer in the provided documents."
+    prompt = f"""You are a helpful AI assistant that answers questions based on the provided context. 
+Please answer the following question using ONLY the context provided below. 
+If the answer cannot be found in the context, say "I cannot find the answer in the provided documents."
 
-Contexts:
+Context:
 {' '.join(contexts)}
 
 Question: {question}
 
 Answer:"""
     
-    # Get response from OpenAI
+    # Get response from Gemini
     response = llm.invoke(prompt)
     
     return jsonify({
