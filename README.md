@@ -2,6 +2,9 @@
 
 LearnFlow is an intelligent document chat system that allows users to upload PDF documents and have interactive conversations about their content. The system uses Google's Gemini AI for text generation and embeddings, combined with Pinecone for efficient vector storage and retrieval.
 
+## Youtube Link
+- Youtube (https://youtu.be/du6j-i-jWos)
+
 ## Features
 
 - 🚀 PDF Document Processing
@@ -151,15 +154,8 @@ Ask questions about the uploaded document.
 - Text-based interaction support
 - Voice-based interaction with silence detection
 - Audio response playback for answers
-
-🚧 In Progress/TODO:
-- Multiple document support
 - Chat history persistence
-- Advanced error handling
 - Document management features
-- Personalized progress tracker with visual dashboards
-- study groups basically a community forum
-- 
 - Enhanced UI/UX features
 
 ## Contributing
