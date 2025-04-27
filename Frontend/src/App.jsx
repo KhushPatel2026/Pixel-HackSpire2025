@@ -15,6 +15,7 @@ import OnbordingProcess from './Pages/Onboarding/OnboardingProcess';
 import Recognition from './Pages/Recognition/Recognition';
 import LearnFlow from './Pages/LearnFlow/LearnFlow';
 import Dashboard from './Pages/Dashboard/Dashboard';
+import QuizzesPage from './Pages/Quiz/Quezzies';
 
 function App() {
   const navigate = useNavigate();
@@ -53,6 +54,7 @@ function App() {
           <Route path="/chatbot" element={<Chatbot />} />
           <Route path="/recognition" element={<Recognition />} />
           <Route path="/learnflow/:learningPathId" element={<LearnFlow />} />
+          <Route path="/quizzes" element={<QuizzesPage />} />
         </Routes>
       </div>
     </div>
