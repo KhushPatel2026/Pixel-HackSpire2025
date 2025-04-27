@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { LayoutDashboard, BookOpenCheck, Award, User, LogOut, Menu, X } from "lucide-react";
+import { LayoutDashboard, BookOpenCheck, Award, User, LogOut, Menu, X, BookOpen } from "lucide-react";
 
 export default function Sidebar() {
   const [isOpen, setIsOpen] = useState(false);
@@ -42,10 +42,11 @@ export default function Sidebar() {
         } md:translate-x-0 transition-transform duration-300 ease-in-out w-64 bg-gradient-to-br from-[#0a1a0a] via-[#0d150d] to-[#091409] text-white flex flex-col z-40 h-full md:h-screen`}
       >
         {/* Sidebar Header */}
-        <div className="p-6 border-b border-green-900/30">
-          <h2 className="text-xl font-bold bg-gradient-to-r from-green-400 to-emerald-400 bg-clip-text text-transparent">
-            LearnFlow
-          </h2>
+        <div className="p-6 border-b border-green-900/30 flex items-center gap-2">
+        <BookOpen className="h-6 w-6 text-green-500" />
+            <span className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-green-500 to-emerald-500">
+              LearnFlow
+            </span>
         </div>
 
         {/* Navigation Items */}

@@ -17,6 +17,7 @@ export default function DailyQuizPage() {
   const [showQuestionSelector, setShowQuestionSelector] = useState(false);
 
   const token = localStorage.getItem('token');
+  const baseurl = import.meta.env.VITE_BASE_URL;
 
   // Generate stars for background
   useEffect(() => {
@@ -48,7 +49,7 @@ export default function DailyQuizPage() {
       try {
         setLoading(true);
         setError(null);
-        const res = await axios.get('http://localhost:3000/api/quiz/daily-quiz', {
+        const res = await axios.get(`${baseurl}/api/quiz/daily-quiz`, {
           headers: { 'x-access-token': token },
         });
 
@@ -81,7 +82,7 @@ export default function DailyQuizPage() {
 
     const fetchLeaderboard = async () => {
       try {
-        const res = await axios.get('http://localhost:3000/api/quiz/leaderboard', {
+        const res = await axios.get(`${baseurl}/api/quiz/leaderboard`, {
           headers: { 'x-access-token': token },
         });
         setLeaderboard(res.data.data);
@@ -115,7 +116,7 @@ export default function DailyQuizPage() {
         })),
       };
       const res = await axios.post(
-        'http://localhost:3000/api/quiz/submit-quiz',
+        `${baseurl}/api/quiz/submit-quiz`,
         payload,
         { headers: { 'x-access-token': token } }
       );
@@ -125,7 +126,7 @@ export default function DailyQuizPage() {
       setResponses([]);
 
       // Refresh leaderboard after submission
-      const leaderboardRes = await axios.get('http://localhost:3000/api/quiz/leaderboard', {
+      const leaderboardRes = await axios.get(`${baseurl}/api/quiz/leaderboard`, {
         headers: { 'x-access-token': token },
       });
       setLeaderboard(leaderboardRes.data.data);

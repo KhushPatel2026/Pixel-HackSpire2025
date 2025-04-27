@@ -12,6 +12,9 @@ function AuthComponent() {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [stars, setStars] = useState([]);
+    const [passwordError, setPasswordError] = useState('');
+
+    const baseurl = import.meta.env.VITE_BASE_URL || 'http://localhost:3000';
 
     // Generate stars for background
     useEffect(() => {
@@ -32,11 +35,33 @@ function AuthComponent() {
         generateStars();
     }, []);
 
+    const validatePassword = (pwd) => {
+        const minLength = pwd.length >= 8;
+        const maxLength = pwd.length <= 10;
+        const hasNumber = /\d/.test(pwd);
+        const hasSymbol = /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(pwd);
+
+        if (!minLength) return 'Password must be at least 8 characters';
+        if (!maxLength) return 'Password must not exceed 10 characters';
+        if (!hasNumber) return 'Password must contain at least one number';
+        if (!hasSymbol) return 'Password must contain at least one symbol';
+        return '';
+    };
+
     async function handleSubmit(event) {
         event.preventDefault();
+        
+        const passwordValidationError = validatePassword(password);
+        if (passwordValidationError) {
+            setPasswordError(passwordValidationError);
+            toast.error(passwordValidationError);
+            return;
+        }
+        setPasswordError('');
+
         const url = isLogin 
-            ? 'http://localhost:3000/api/auth/login'
-            : 'http://localhost:3000/api/auth/register';
+            ? `${baseurl}/api/auth/login`
+            : `${baseurl}/api/auth/register`;
         
         const body = isLogin 
             ? { email, password }
@@ -57,11 +82,7 @@ function AuthComponent() {
                 localStorage.setItem('token', data.user);
                 toast.success(`${isLogin ? 'Login' : 'Registration'} successful!`);
                 setTimeout(() => {
-                    if(isLogin==='Login') {
                     window.location.href = '/dashboard';
-                    } else {
-                    window.location.href = '/dashboard';
-                    }
                 }, 1500);
             } else {
                 toast.error('Please check your credentials');
@@ -77,6 +98,7 @@ function AuthComponent() {
         setName('');
         setEmail('');
         setPassword('');
+        setPasswordError('');
     };
 
     return (
@@ -170,8 +192,11 @@ function AuthComponent() {
                                 type="password"
                                 placeholder="Password"
                                 required
-                                className="w-full px-12 py-3 bg-[#0d1f0d]/50 border border-green-900/50 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500/50 focus:border-transparent transition-all duration-300"
+                                className={`w-full px-12 py-3 bg-[#0d1f0d]/50 border ${passwordError ? 'border-red-500/50' : 'border-green-900/50'} rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500/50 focus:border-transparent transition-all duration-300`}
                             />
+                            {passwordError && (
+                                <p className="text-red-400 text-sm mt-2">{passwordError}</p>
+                            )}
                         </div>
 
                         <motion.button

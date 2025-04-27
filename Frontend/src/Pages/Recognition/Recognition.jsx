@@ -33,7 +33,7 @@ export default function DocumentChat() {
   const [error, setError] = useState(null);
   const [uploadStatus, setUploadStatus] = useState(null);
 
-  const API_BASE_URL = "http://localhost:5000"; // Flask backend URL
+  const API_BASE_URL = import.meta.env.VITE_ML_URL; // Flask backend URL
 
   // Handle file selection
   const handleFileChange = (e) => {
