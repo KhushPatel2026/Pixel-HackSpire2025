@@ -28,6 +28,8 @@ const Profile = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
+  const baseurl = import.meta.env.VITE_BASE_URL || 'http://localhost:3000';
+
   // Handle URL token
   useEffect(() => {
     const urlParams = new URLSearchParams(location.search);
@@ -50,7 +52,7 @@ const Profile = () => {
 
     const fetchProfile = async (retryCount = 0) => {
       try {
-        const response = await fetch('http://localhost:3000/api/profile/profile', {
+        const response = await fetch(`${baseurl}/api/profile/profile`, {
           headers: { 'x-access-token': token },
         });
 
@@ -88,7 +90,7 @@ const Profile = () => {
     const name = form.name.value.trim();
     const email = form.email.value.trim();
     const preferredDifficulty = form.preferredDifficulty.value;
-    const preferredLearningStyle = form.preferredLearningStyle.value;
+    const preferredLearningStyle = "Visual";
     const dailyStudyTime = form.dailyStudyTime.value.trim();
 
     // Validate inputs
@@ -104,7 +106,7 @@ const Profile = () => {
     }
 
     try {
-      const response = await fetch('http://localhost:3000/api/profile/profile/edit', {
+      const response = await fetch(`${baseurl}/api/profile/profile/edit`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -167,7 +169,7 @@ const Profile = () => {
     }
 
     try {
-      const response = await fetch('http://localhost:3000/api/profile/profile/change-password', {
+      const response = await fetch(`${baseurl}/api/profile/profile/change-password`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -205,7 +207,7 @@ const Profile = () => {
 
     const fetchStreakAndBadges = async () => {
       try {
-        const response = await fetch('http://localhost:3000/api/profile/streak-badges', {
+        const response = await fetch(`${baseurl}/api/profile/streak-badges`, {
           headers: { 'x-access-token': token },
         });
 

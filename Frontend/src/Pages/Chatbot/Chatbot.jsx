@@ -38,7 +38,7 @@ const Chatbot = () => {
         generateStars();
     }, []);
 
-    const API_BASE_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3000';
+    const API_BASE_URL = import.meta.env.VITE_BASE_URL || 'http://localhost:3000';
     const token = localStorage.getItem('token');
 
     const SILENCE_THRESHOLD = -50;

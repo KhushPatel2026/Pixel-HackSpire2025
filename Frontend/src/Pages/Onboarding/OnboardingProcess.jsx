@@ -12,6 +12,8 @@ const OnboardingProcess = ({ onComplete }) => {
   const [stars, setStars] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
 
+  const baseurl = import.meta.env.VITE_BASE_URL || 'http://localhost:3000';
+
   useEffect(() => {
     const savedStep = localStorage.getItem('onboardingStep');
     if (savedStep) {
@@ -64,7 +66,7 @@ const OnboardingProcess = ({ onComplete }) => {
         throw new Error('No authentication token found');
       }
 
-      const response = await fetch('http://localhost:3000/api/profile/user/preferences', {
+      const response = await fetch(`${baseurl}/api/profile/user/preferences`, {
         method: 'POST',
         headers: { 'x-access-token': token },
         body: JSON.stringify({
