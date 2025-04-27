@@ -300,7 +300,7 @@ const Chatbot = () => {
                             <BookOpen className="h-6 w-6 text-green-400" />
                         </div>
                         <h1 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-green-400 to-emerald-400">
-                            LearnFlow Assistant
+                            LearnFlow Study Buddy
                         </h1>
                     </div>
                     
@@ -369,7 +369,7 @@ const Chatbot = () => {
                                 <div className="p-3 bg-gradient-to-tr from-green-600/10 to-emerald-600/10 rounded-full mb-4">
                                     <BookOpen className="h-10 w-10 text-green-400" />
                                 </div>
-                                <p className="text-lg mb-2">Welcome to LearnFlow Assistant</p>
+                                <p className="text-lg mb-2">Welcome to LearnFlow Study Buddy</p>
                                 <p className="text-sm max-w-md">Start a conversation by typing or using voice input</p>
                             </div>
                         )}
