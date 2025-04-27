@@ -17,7 +17,27 @@ const path = require("path");
 
 const clientUrl = process.env.CLIENT_URL || "http://localhost:5173";
 
-app.use(cors({ origin: "https://learn-flow-pixel.vercel.app", credentials: true }));
+const corsOptions = {
+  origin: "https://learn-flow-pixel.vercel.app", // Allow only this origin
+  credentials: true, // Allow credentials (cookies, authorization headers)
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"], // Allowed methods
+  allowedHeaders: [
+    "X-CSRF-Token",
+    "X-Requested-With",
+    "Accept",
+    "Accept-Version",
+    "Content-Length",
+    "Content-MD5",
+    "Content-Type",
+    "Date",
+    "X-Api-Version",
+    "Authorization",
+    "x-access-token",
+  ], // Allowed headers
+};
+
+app.use(cors(corsOptions));
+
 app.use(express.static("public"));
 app.use("/audio", express.static(path.join(__dirname, "public/audio")));
 app.use(express.json());
