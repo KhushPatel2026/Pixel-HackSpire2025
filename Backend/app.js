@@ -47,9 +47,9 @@ app.use("/api/quiz", quizRoutes);
 app.use("/api", analyticsRoutes);
 app.use("/api", cbseCourseRoutes);
 
-app.get("/", (req, res) => {
+app.get("/test", (req, res) => {
   
-  res.send("Server is running");
+  res.json("Server is running");
 });
 
 const PORT = process.env.PORT || 5000;
