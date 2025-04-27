@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const LearningController = require('../controller/learningController');
+const LearningController = require('../Controller/learningController');
 const multer = require('multer');
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
