@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const QuizController = require('../controller/quizController');
+const QuizController = require('../Controller/quizController');
 
 router.post('/learning-path-quiz', QuizController.generateLearningPathQuiz.bind(QuizController));
 router.post('/custom-quiz', QuizController.generateCustomQuiz.bind(QuizController));

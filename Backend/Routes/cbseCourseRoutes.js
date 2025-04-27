@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const CbseCourseController = require('../controller/cbseCourseController');
+const CbseCourseController = require('../Controller/cbseCourseController');
 const multer = require('multer');
 
 const upload = multer({

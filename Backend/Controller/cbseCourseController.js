@@ -1,7 +1,7 @@
-const LearningPath = require('../model/LearningPath');
+const LearningPath = require('../Model/LearningPath');
 const jwt = require('jsonwebtoken');
 const coursesConfig = require('../Utils/CbseConfig');
-const User = require('../model/User');
+const User = require('../Model/User');
 
 class CbseCourseController {
     async verifyToken(token, res) {

@@ -1,9 +1,9 @@
 const { GoogleGenerativeAI } = require('@google/generative-ai');
-const LearningPathQuiz = require('../model/LearningPathQuiz');
-const CustomQuiz = require('../model/CustomQuiz');
-const DailyQuiz = require('../model/DailyQuiz');
-const LearningPath = require('../model/LearningPath');
-const User = require('../model/User');
+const LearningPathQuiz = require('../Model/LearningPathQuiz');
+const CustomQuiz = require('../Model/CustomQuiz');
+const DailyQuiz = require('../Model/DailyQuiz');
+const LearningPath = require('../Model/LearningPath');
+const User = require('../Model/User');
 const jwt = require('jsonwebtoken');
 const aiService = require('../utils/quizAiService');
 
