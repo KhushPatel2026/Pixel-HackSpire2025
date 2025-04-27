@@ -3,7 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
-import { User, Lock } from 'lucide-react';
+import { User, Lock, Flame, Award } from 'lucide-react';
 
 // Mock stars data for background
 const stars = Array.from({ length: 100 }, (_, i) => ({
@@ -198,6 +198,65 @@ const Profile = () => {
     }
   };
 
+  // Fetch streak and badges
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    if (!token || !profile) return;
+
+    const fetchStreakAndBadges = async () => {
+      try {
+        const response = await fetch('http://localhost:3000/api/profile/streak-badges', {
+          headers: { 'x-access-token': token },
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to fetch streak and badges');
+        }
+
+        const data = await response.json();
+        if (data.status === 'ok') {
+          setProfile(prevProfile => ({
+            ...prevProfile,
+            streak: data.streak,
+            badges: data.badges
+          }));
+        } else {
+          throw new Error(data.error || 'Streak and badges fetch failed');
+        }
+      } catch (error) {
+        console.error('Streak and badges fetch error:', error);
+        // Don't show error toast for this - it's not critical
+      }
+    };
+
+    fetchStreakAndBadges();
+  }, [profile?.id]);
+
+  // Badge Info component
+  const BadgeInfo = ({ badge }) => {
+    const [showTooltip, setShowTooltip] = useState(false);
+    
+    return (
+      <div 
+        className="relative" 
+        onMouseEnter={() => setShowTooltip(true)}
+        onMouseLeave={() => setShowTooltip(false)}
+      >
+        <div className={`w-12 h-12 rounded-full flex items-center justify-center ${badge.unlocked ? 'bg-gradient-to-br from-green-500 to-emerald-600' : 'bg-gray-700'}`}>
+          {badge.icon === 'flame' && <Flame className={`h-6 w-6 ${badge.unlocked ? 'text-white' : 'text-gray-500'}`} />}
+          {badge.icon === 'award' && <Award className={`h-6 w-6 ${badge.unlocked ? 'text-white' : 'text-gray-500'}`} />}
+        </div>
+        {showTooltip && (
+          <div className="absolute bottom-full mb-2 left-1/2 transform -translate-x-1/2 w-40 bg-black/80 text-white text-xs p-2 rounded z-20">
+            <p className="font-bold">{badge.name}</p>
+            <p>{badge.description}</p>
+            {!badge.unlocked && <p className="text-gray-400 mt-1">Not unlocked yet</p>}
+          </div>
+        )}
+      </div>
+    );
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#0a1a0a] via-[#0d150d] to-[#091409] text-white">
@@ -212,6 +271,17 @@ const Profile = () => {
       </div>
     );
   }
+
+  // Default badges if none present in profile
+  const defaultBadges = [
+    { id: 1, name: "First Login", description: "Logged in for the first time", icon: "award", unlocked: true },
+    { id: 2, name: "Week Warrior", description: "Maintained a 7-day streak", icon: "flame", unlocked: false },
+    { id: 3, name: "Study Master", description: "Completed 10 study sessions", icon: "award", unlocked: false },
+    { id: 4, name: "Month Champion", description: "Maintained a 30-day streak", icon: "flame", unlocked: false }
+  ];
+
+  const badges = profile?.badges || defaultBadges;
+  const streak = profile?.streak || { current: 0, longest: 0, lastActivity: null };
 
   return (
     <div className="min-h-screen flex flex-col bg-gradient-to-br from-[#0a1a0a] via-[#0d150d] to-[#091409] text-white p-4 overflow-hidden">
@@ -277,6 +347,38 @@ const Profile = () => {
             <div className="md:w-1/3 flex flex-col items-center">
               <div className="w-32 h-32 bg-gradient-to-br from-green-600 to-emerald-600 rounded-full flex items-center justify-center text-4xl mb-4">
                 {profile?.name.charAt(0).toUpperCase()}
+              </div>
+              
+              {/* Streak Section */}
+              <div className="w-full bg-[#0d1f0d]/50 border border-green-900/50 rounded-xl p-4 mt-4 text-center">
+                <div className="flex items-center justify-center mb-2">
+                  <Flame className="h-6 w-6 text-orange-500 mr-2" />
+                  <h3 className="text-lg font-semibold text-white">Daily Streak</h3>
+                </div>
+                <div className="text-3xl font-bold text-white mb-1">{streak.current}</div>
+                <div className="text-sm text-gray-400">Longest streak: {streak.longest} days</div>
+                <div className="mt-4 h-2 bg-gray-700 rounded-full overflow-hidden">
+                  <div 
+                    className="h-full bg-gradient-to-r from-orange-500 to-red-500" 
+                    style={{ width: `${Math.min(streak.current / 10 * 100, 100)}%` }} 
+                  ></div>
+                </div>
+                <div className="mt-2 text-xs text-gray-400">
+                  {streak.lastActivity ? `Last activity: ${new Date(streak.lastActivity).toLocaleDateString()}` : 'Start your streak today!'}
+                </div>
+              </div>
+              
+              {/* Badges Section */}
+              <div className="w-full bg-[#0d1f0d]/50 border border-green-900/50 rounded-xl p-4 mt-4">
+                <div className="flex items-center justify-center mb-4">
+                  <Award className="h-6 w-6 text-yellow-500 mr-2" />
+                  <h3 className="text-lg font-semibold text-white">Badges</h3>
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 justify-items-center">
+                  {badges.map(badge => (
+                    <BadgeInfo key={badge.id} badge={badge} />
+                  ))}
+                </div>
               </div>
             </div>
 
@@ -498,4 +600,4 @@ const Profile = () => {
   );
 };
 
-export default Profile;
+export default Profile
