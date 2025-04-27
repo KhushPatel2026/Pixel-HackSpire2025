@@ -555,15 +555,7 @@ export default function Landing() {
             transition={{ duration: 0.6, delay: 0.8 }}
             className="mt-16 text-center"
           >
-            <button 
-              onClick={handleCTAClick}
-              className="px-8 py-3 rounded-full bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 text-white font-medium transition-all duration-300 hover:shadow-[0_0_15px_rgba(16,185,129,0.5)] transform hover:scale-105 group"
-            >
-              <span className="flex items-center justify-center">
-                Start Your Learning Journey
-                <ArrowRight className="ml-2 h-5 w-5 transform group-hover:translate-x-1 transition-transform duration-300" />
-              </span>
-            </button>
+         
           </motion.div>
         </div>
       </section>

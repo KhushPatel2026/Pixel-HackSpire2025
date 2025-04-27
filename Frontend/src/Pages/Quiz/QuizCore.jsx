@@ -303,13 +303,13 @@ export default function QuizCore({
                         className="p-3 rounded-lg bg-[#0d1f0d]/50 border border-green-600/30"
                       >
                         <a
-                          href={resource.url}
+                          href={resource?.url}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="text-green-400 hover:underline flex items-center gap-2"
                         >
                           <Link className="h-4 w-4" />
-                          {resource.title}
+                          {resource?.title}
                         </a>
                       </motion.li>
                     ))}

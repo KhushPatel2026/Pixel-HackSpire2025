@@ -47,7 +47,12 @@ app.use("/api/quiz", quizRoutes);
 app.use("/api", analyticsRoutes);
 app.use("/api", cbseCourseRoutes);
 
-const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
+app.get("/test", (req, res) => {
+  
+  res.json("Server is running");
+});
+
+const PORT = process.env.PORT || 3000;
+app.listen(3000, () => {
   console.log("Server started");
 });
