@@ -17,7 +17,7 @@ const path = require("path");
 
 const clientUrl = process.env.CLIENT_URL || "http://localhost:5173";
 
-app.use(cors({ origin: clientUrl, credentials: true }));
+app.use(cors({ origin: "https://learn-flow-pixel.vercel.app", credentials: true }));
 app.use(express.static("public"));
 app.use("/audio", express.static(path.join(__dirname, "public/audio")));
 app.use(express.json());
