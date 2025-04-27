@@ -440,7 +440,7 @@ const Profile = () => {
                     <option value="Hard">Hard</option>
                   </select>
                 </div>
-                <div>
+                {/* <div>
                   <label className="block text-gray-400 mb-1 text-sm">Preferred Learning Style</label>
                   <select
                     name="preferredLearningStyle"
@@ -454,7 +454,7 @@ const Profile = () => {
                     <option value="Reading/Writing">Reading/Writing</option>
                     <option value="Kinesthetic">Kinesthetic</option>
                   </select>
-                </div>
+                </div> */}
                 <div>
                   <label className="block text-gray-400 mb-1 text-sm">Daily Study Time (minutes)</label>
                   <input
