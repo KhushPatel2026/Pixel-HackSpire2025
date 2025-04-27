@@ -31,7 +31,8 @@ const learningPathSchema = new mongoose.Schema({
         badges: [{ type: String }],
         streak: { type: Number, default: 0 },
         points: { type: Number, default: 0 }
-    }
+    },
+    flowchart: { type: String },
 });
 
 module.exports = mongoose.model('LearningPath', learningPathSchema);

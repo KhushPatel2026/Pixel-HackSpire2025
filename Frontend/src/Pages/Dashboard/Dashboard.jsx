@@ -7,6 +7,7 @@ import {
   PlayCircle,
   X,
   Download,
+  MoveRight,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { ToastContainer, toast } from "react-toastify";
@@ -25,6 +26,7 @@ import {
   CartesianGrid,
 } from "recharts";
 import jsPDF from "jspdf";
+import mermaid from "mermaid"; // Added Mermaid.js import
 
 // Mock stars data for background
 const stars = Array.from({ length: 100 }, (_, i) => ({
@@ -45,10 +47,11 @@ const Dashboard = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [courseName, setCourseName] = useState("");
   const [difficultyLevel, setDifficultyLevel] = useState("");
-  const [courseType, setCourseType] = useState(""); // New state for course type
-  const [cbseCourse, setCbseCourse] = useState(""); // New state for CBSE course
+  const [courseType, setCourseType] = useState("");
+  const [cbseCourse, setCbseCourse] = useState("");
   const [isCreatingPath, setIsCreatingPath] = useState(false);
   const [pastScores, setPastScores] = useState([]);
+  const [flowchartPathId, setFlowchartPathId] = useState(null); // Added state for flowchart toggle
   const navigate = useNavigate();
 
   // Mock CBSE courses (replace with actual data if fetched from backend)
@@ -60,6 +63,25 @@ const Dashboard = () => {
     { id: "class-12-pcb", name: "Class 12th CBSE (PCB)" },
     { id: "class-12-pcm", name: "Class 12th CBSE (PCM)" },
   ];
+
+  // Initialize Mermaid.js
+  useEffect(() => {
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'dark',
+      flowchart: {
+        useMaxWidth: true,
+        htmlLabels: true,
+      },
+    });
+  }, []);
+
+  // Re-render Mermaid.js when flowchart is toggled
+  useEffect(() => {
+    if (flowchartPathId) {
+      mermaid.contentLoaded();
+    }
+  }, [flowchartPathId]);
 
   // Fetch user profile and dashboard data
   useEffect(() => {
@@ -255,6 +277,11 @@ const Dashboard = () => {
     }
   };
 
+  // Handle flowchart toggle
+  const handleToggleFlowchart = (pathId) => {
+    setFlowchartPathId(flowchartPathId === pathId ? null : pathId);
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#0a1a0a] via-[#0d150d] to-[#091409] text-white">
@@ -375,6 +402,31 @@ const Dashboard = () => {
                             Quiz Pending!
                           </p>
                         )}
+                        <div className="flex items-center justify-between mb-2">
+                          <a></a>
+                          <motion.button
+                            whileHover={{ scale: 1.02 }}
+                            whileTap={{ scale: 0.98 }}
+                            onClick={() => handleToggleFlowchart(path.id)}
+                            className="px-3 py-1 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-400 text-sm rounded-lg transition duration-300"
+                          >
+                            {flowchartPathId === path.id ? "Hide Flowchart" : "View Flowchart"}
+                          </motion.button>
+                        </div>
+                        {flowchartPathId === path.id && (
+                          <div className="mt-2 p-4 bg-[#0a1a0a]/80 rounded-lg border border-green-900/50">
+                            <h4 className="text-sm font-medium text-white mb-2">
+                              Flowchart: {path.courseName}
+                            </h4>
+                            {path.flowchart ? (
+                              <div className="mermaid">{path.flowchart}</div>
+                            ) : (
+                              <p className="text-gray-400 text-sm">
+                                No flowchart available for this course.
+                              </p>
+                            )}
+                          </div>
+                        )}
                         <motion.button
                           whileHover={{ scale: 1.02 }}
                           whileTap={{ scale: 0.98 }}
@@ -493,6 +545,7 @@ const Dashboard = () => {
                         />
                       </LineChart>
                     </ResponsiveContainer>
+                    <a href="/quizzes" className="flex justify-end items-center font-bold ">View you past quizzes    <MoveRight className="flex items-center justify-center ml-1"/></a>
                   </div>
                 </div>
               </motion.div>

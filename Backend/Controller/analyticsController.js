@@ -120,4 +120,39 @@ const getPastScore = async (req, res) => {
   }
 }
 
-module.exports = { getAnalytics, getPastScore };
+const getAllQuizzes = async(req, res) => {
+  const token = req.headers["x-access-token"];
+  if (!token) {
+    return res
+      .status(401)
+      .json({ status: "error", error: "No token provided" });
+  }
+
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const email = decoded.email;
+    const user = await User.findOne({ email });
+
+    if (!user) {
+      return res.status(404).json({ status: "error", error: "User not found" });
+    }
+
+    // Get user's quiz history
+    const quizHistory = await LearningPathQuiz.find({ userId: user._id });
+
+    return res.json({
+      status: "ok",
+      data: {
+        quizHistory,
+      },
+    });
+  } catch (error) {
+    console.error("All quizzes error:", error);
+    if (error.name === "JsonWebTokenError") {
+      return res.status(401).json({ status: "error", error: "Invalid token" });
+    }
+    return res.status(500).json({ status: "error", error: "Server error" });
+  }
+}
+
+module.exports = { getAnalytics, getPastScore, getAllQuizzes };

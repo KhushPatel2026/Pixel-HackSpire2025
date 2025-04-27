@@ -23,6 +23,19 @@ class LearningController {
         }
     }
 
+    // Generate Mermaid.js flowchart syntax based on topics
+    generateFlowchart(topics) {
+        let mermaidSyntax = 'graph TD;\n';
+        topics.sort((a, b) => a.order - b.order).forEach((topic, index) => {
+            const nodeStyle = topic.completionStatus ? '[Completed]' : '[Pending]';
+            mermaidSyntax += `    T${index}["${topic.topicName} ${nodeStyle}"];\n`;
+            if (index > 0) {
+                mermaidSyntax += `    T${index - 1} --> T${index};\n`;
+            }
+        });
+        return mermaidSyntax;
+    }
+
     async getLearningPath(req, res) {
         try {
             const token = req.headers['x-access-token'];
@@ -61,7 +74,8 @@ class LearningController {
                     firstIncompleteSubtopicIndex: firstIncompleteIndex >= 0 ? firstIncompleteIndex : path.topics.length,
                     points: path.gamification.points,
                     strength: path.courseStrength,
-                    weakness: path.courseWeakness
+                    weakness: path.courseWeakness,
+                    flowchart: path.flowchart 
                 };
             });
 
@@ -89,24 +103,29 @@ class LearningController {
                 user.learningPreferences
             );
 
+            const topics = learningPathData.topics.map(topic => ({
+                topicName: topic.name,
+                topicDescription: topic.description,
+                topicResourceLink: topic.resourceLinks,
+                timeSpent: 0,
+                order: topic.order,
+                completionStatus: false,
+                completionDate: null
+            }));
+
+            const flowchart = this.generateFlowchart(topics);
+
             const learningPath = new LearningPath({
                 userId: user._id,
                 courseName,
-                topics: learningPathData.topics.map(topic => ({
-                    topicName: topic.name,
-                    topicDescription: topic.description,
-                    topicResourceLink: topic.resourceLinks,
-                    timeSpent: 0,
-                    order: topic.order,
-                    completionStatus: false,
-                    completionDate: null
-                })),
+                topics,
                 difficultyLevel,
                 courseStrength: learningPathData.strength,
                 courseWeakness: learningPathData.weakness,
                 courseDuration: learningPathData.duration,
                 courseResult: 'In Progress',
-                gamification: { badges: [], streak: 0, points: 0 }
+                gamification: { badges: [], streak: 0, points: 0 },
+                flowchart
             });
 
             await learningPath.save();
@@ -145,6 +164,8 @@ class LearningController {
                 completionDate: topic.completionDate || null
             }));
 
+            learningPath.flowchart = this.generateFlowchart(learningPath.topics);
+
             const completedTopics = learningPath.topics.filter(t => t.completionStatus).length;
             learningPath.courseCompletionStatus = Math.round((completedTopics / learningPath.topics.length) * 100);
             if (learningPath.courseCompletionStatus === 100 && !learningPath.courseCompletionDate) {
@@ -180,6 +201,9 @@ class LearningController {
                 { _id: learningPathId, 'topics.topicName': subtopicName },
                 { $push: { 'topics.$.topicResourceLink': simplifiedContent } }
             );
+
+            learningPath.flowchart = this.generateFlowchart(learningPath.topics);
+            await learningPath.save();
 
             res.json({ status: 'ok', data: { simplified: simplifiedContent } });
         } catch (error) {
@@ -223,6 +247,9 @@ class LearningController {
             await LearningPath.findByIdAndUpdate(learningPathId, {
                 $push: { quizzes: { quizId: quiz._id, completed: false, subtopicsCovered: subtopicNames } }
             });
+
+            learningPath.flowchart = this.generateFlowchart(learningPath.topics);
+            await learningPath.save();
 
             res.json({ status: 'ok', data: quiz });
         } catch (error) {
@@ -342,6 +369,7 @@ class LearningController {
 
                 const completedTopics = learningPath.topics.filter(t => t.completionStatus).length;
                 learningPath.courseCompletionStatus = Math.round((completedTopics / learningPath.topics.length) * 100);
+                learningPath.flowchart = this.generateFlowchart(learningPath.topics);
                 if (learningPath.courseCompletionStatus === 100 && !learningPath.courseCompletionDate) {
                     learningPath.courseCompletionDate = new Date();
                     await User.findByIdAndUpdate(user._id, { $inc: { 'progressMetrics.completedCourses': 1 } });
@@ -475,7 +503,8 @@ class LearningController {
                         weakness: path.courseWeakness,
                         points: path.gamification.points,
                         firstIncompleteSubtopicIndex: firstIncompleteIndex >= 0 ? firstIncompleteIndex : path.topics.length,
-                        quizPending
+                        quizPending,
+                        flowchart: path.flowchart // Include flowchart data
                     };
                 }),
                 quizStats: {
