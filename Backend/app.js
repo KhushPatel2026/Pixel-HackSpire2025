@@ -15,7 +15,9 @@ const passport = require("./utils/passportConfig");
 const session = require("express-session");
 const path = require("path");
 
-app.use(cors({ origin: "http://localhost:5173", credentials: true }));
+const clientUrl = process.env.CLIENT_URL || "http://localhost:5173";
+
+app.use(cors({ origin: clientUrl, credentials: true }));
 app.use(express.static("public"));
 app.use("/audio", express.static(path.join(__dirname, "public/audio")));
 app.use(express.json());
@@ -45,6 +47,7 @@ app.use("/api/quiz", quizRoutes);
 app.use("/api", analyticsRoutes);
 app.use("/api", cbseCourseRoutes);
 
-app.listen(3000, () => {
-  console.log("Server started on 3000");
+const PORT = process.env.PORT || 5000;
+app.listen(PORT, () => {
+  console.log("Server started");
 });
